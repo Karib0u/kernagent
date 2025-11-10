@@ -13,9 +13,17 @@ def setup_logging(debug: bool = False) -> None:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    # Suppress httpx logs unless in debug mode
     if not debug:
         logging.getLogger("httpx").setLevel(logging.WARNING)
+        # Quiet noisy dependencies (vivisect/capa) unless explicitly debugging
+        for noisy in (
+            "vivisect",
+            "vivisect.base",
+            "vivisect.analysis",
+            "vivisect.tools",
+            "viv_utils",
+        ):
+            logging.getLogger(noisy).setLevel(logging.ERROR)
 
 
 def get_logger(name: str) -> logging.Logger:

@@ -199,6 +199,19 @@ class SnapshotTools:
         except ValueError as exc:
             return {"error": str(exc)}
 
+    def get_capa_summary(self) -> Dict[str, Any]:
+        """Return the CAPA summary artifact if present."""
+
+        path = self.root / "capa_summary.json"
+        if not path.exists():
+            return {"error": "capa_summary.json not found"}
+
+        try:
+            with path.open() as f:
+                return json.load(f)
+        except (json.JSONDecodeError, ValueError) as exc:
+            return {"error": f"Invalid JSON in capa_summary.json: {exc}"}
+
     def list_files(self, directory: str = ".", pattern: str = "*") -> Dict[str, Any]:
         try:
             root = self._resolve(".")
@@ -1276,4 +1289,5 @@ def build_tool_map(snapshot: SnapshotTools) -> Dict[str, Any]:
         "resolve_symbol": snapshot.resolve_symbol,
         "get_xrefs": snapshot.get_xrefs,
         "search_decomp": snapshot.search_decomp,
+        "get_capa_summary": snapshot.get_capa_summary,
     }

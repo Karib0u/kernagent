@@ -1,0 +1,77 @@
+{
+  "schema_version": "capa_summary_v1",
+  "capa_version": "9.2.1",
+  "generated_at": "2025-01-01T00:00:00Z",
+  "rules_source": "tests",
+  "rules_loaded": 2,
+  "sample": {
+    "sha256": "deadbeef",
+    "md5": "badc0de",
+    "path": "bifrose.exe"
+  },
+  "counts": {
+    "rules": 2,
+    "matches": 3,
+    "attack_mappings": 1,
+    "mbc_mappings": 1
+  },
+  "highlights": {
+    "top_attack_ids": [
+      {
+        "id": "T1050",
+        "count": 1,
+        "technique": "Service Execution",
+        "tactic": ["Persistence"]
+      }
+    ],
+    "top_tactics": [
+      {"tactic": "Persistence", "count": 1}
+    ],
+    "top_namespaces": [
+      {"namespace": "persistence/service", "count": 1},
+      {"namespace": "collection/keylogging", "count": 1}
+    ]
+  },
+  "rules": [
+    {
+      "name": "installs service",
+      "namespace": "persistence/service",
+      "scope": "function",
+      "description": "Creates a Windows service for persistence",
+      "attack": [
+        {
+          "id": "T1050",
+          "technique": "Service Execution",
+          "subtechnique": null,
+          "tactic": ["Persistence"]
+        }
+      ],
+      "mbc": [],
+      "locations": [
+        {"type": "address", "address": "0x401000"}
+      ],
+      "tags": ["service", "persistence"],
+      "match_count": 2
+    },
+    {
+      "name": "captures keystrokes",
+      "namespace": "collection/keylogging",
+      "scope": "function",
+      "description": "Hooks keyboard events",
+      "attack": [],
+      "mbc": [
+        {
+          "id": "MBC-1",
+          "behavior": "Keylogging",
+          "objective": ["Collection"],
+          "method": "Hooking"
+        }
+      ],
+      "locations": [
+        {"type": "address", "address": "0x402000"}
+      ],
+      "tags": ["keylog"],
+      "match_count": 1
+    }
+  ]
+}

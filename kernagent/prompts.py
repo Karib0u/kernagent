@@ -24,6 +24,7 @@ You have read-only access to structured analysis artifacts extracted from the bi
 - callgraph.jsonl: call edges (from/to, names, types)
 - index.json: lookup tables (name <-> address) used internally by tools
 - data.jsonl: globals / structured data (names, types, addresses, sizes)
+- capa_summary.json: filtered CAPA hits (rule names, namespaces, ATT&CK/MBC tags, representative locations)
 
 You CANNOT modify code, rename symbols, or debug. All tools are for analysis only.
 
@@ -32,6 +33,7 @@ You CANNOT modify code, rename symbols, or debug. All tools are for analysis onl
 Always ground conclusions in tool outputs:
 - Prefer targeted queries (search_* tools) over dumping large files.
 - Use functions + strings + imports + callgraph together to infer behavior.
+- Cross-check CAPA highlights (get_capa_summary) for fast ATT&CK/MBC mappings when describing capabilities.
 - When answering:
   1. State your conclusion.
   2. Show precise evidence (addresses, function names, imports, strings).
@@ -101,6 +103,7 @@ The summary fields you may see include:
 - key_functions: a limited set of functions (EA, name, size, complexity, capabilities, callers/callees, associated strings) selected as behaviorally important.
 - possible_configs: candidate embedded configuration or data blobs.
 - suspicion_signals: precomputed boolean hints (e.g. uses_network, has_persistence_indicators, has_anti_debug_vm_indicators, etc.).
+- capa: CAPA highlights (top ATT&CK techniques, namespaces, and rule hits) when available.
 
 Your tasks:
 
@@ -175,6 +178,20 @@ TOOLS = [
                     }
                 },
                 "required": ["filepath"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_capa_summary",
+            "description": (
+                "Return the filtered CAPA summary (capa_summary.json) including rule hits, "
+                "namespaces, ATT&CK/MBC mappings, and representative locations."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {}
             }
         }
     },

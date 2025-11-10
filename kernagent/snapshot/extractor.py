@@ -9,6 +9,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List
 
+from ..capa_runner import build_capa_summary
 from ..log import get_logger
 
 logger = get_logger(__name__)
@@ -795,6 +796,9 @@ class BinaryArchiveExtractor:
         decomp_dir.mkdir(exist_ok=True)
 
         summary: Dict[str, Any] | None = None
+        metadata: Dict[str, Any] | None = None
+        meta_path = self.output_dir / "meta.json"
+        capa_summary_path: Path | None = None
 
         try:
             with pyghidra.open_program(self.binary_path, analyze=True) as flat_api:
@@ -808,7 +812,7 @@ class BinaryArchiveExtractor:
                 self.decompiler.openProgram(program)
 
                 metadata = self.extract_metadata(program)
-                with open(self.output_dir / "meta.json", "w", encoding="utf-8") as f:
+                with open(meta_path, "w", encoding="utf-8") as f:
                     json.dump(metadata, f, indent=2)
 
                 self.log(f"Metadata extracted (SHA256: {metadata['sha256']})")
@@ -901,6 +905,18 @@ class BinaryArchiveExtractor:
         finally:
             if self.decompiler:
                 self.decompiler.dispose()
+
+        if metadata:
+            try:
+                capa_summary_path = build_capa_summary(self.binary_path, self.output_dir)
+            except Exception as exc:  # pragma: no cover - runtime specific
+                logger.warning("capa summary generation failed: %s", exc)
+                capa_summary_path = None
+
+            if capa_summary_path:
+                metadata.setdefault("artifacts", {})["capa_summary"] = capa_summary_path.name
+                with meta_path.open("w", encoding="utf-8") as f:
+                    json.dump(metadata, f, indent=2)
 
         shutil.copy2(self.binary_path, self.output_dir / self.binary_path.name)
 

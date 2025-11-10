@@ -59,6 +59,16 @@ RUN apt-get update && apt-get install -y \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
+# Download capa-rules once so every build has a deterministic rule pack
+ENV CAPA_RULES_VERSION=9.2.1
+ENV CAPA_RULES_URL=https://github.com/mandiant/capa-rules/archive/refs/tags/v${CAPA_RULES_VERSION}.zip
+RUN rm -rf /opt/capa-rules \
+    && wget -q "${CAPA_RULES_URL}" -O /tmp/capa-rules.zip \
+    && unzip -q /tmp/capa-rules.zip -d /tmp \
+    && mv "/tmp/capa-rules-${CAPA_RULES_VERSION}" /opt/capa-rules \
+    && rm /tmp/capa-rules.zip
+ENV CAPA_RULES_PATH=/opt/capa-rules
+
 # Bring in the compiled Ghidra distribution (with native decompiler)
 COPY --from=ghidra-builder /ghidra /opt/ghidra
 ENV GHIDRA_INSTALL_DIR=/opt/ghidra
@@ -81,6 +91,7 @@ RUN mkdir -p /workspace/project/kernagent
 COPY kernagent/__init__.py \
      kernagent/__main__.py \
      kernagent/agent.py \
+     kernagent/capa_runner.py \
      kernagent/cli.py \
      kernagent/config.py \
      kernagent/llm_client.py \
@@ -92,12 +103,20 @@ COPY kernagent/__init__.py \
 COPY kernagent/oneshot /workspace/project/kernagent/oneshot
 COPY kernagent/snapshot /workspace/project/kernagent/snapshot
 
+# Pin Python version to 3.12 (python-flirt doesn't have wheels for 3.14 yet)
+ENV UV_PYTHON=3.12
+
 # Install dependencies using uv (including dev dependencies for testing)
 RUN cd /workspace/project && uv sync --all-groups
+
+# Default to the project virtual environment at runtime so we can invoke
+# python modules directly without re-running `uv run` on every container start.
+ENV VIRTUAL_ENV=/workspace/project/.venv
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
 # Share binaries via mounted volume
 VOLUME /data
 
-# Use uv to run the application
-ENTRYPOINT ["uv", "run", "--directory", "/workspace/project", "-m", "kernagent.cli"]
+# Run the CLI directly from the virtual environment
+ENTRYPOINT ["python", "-m", "kernagent.cli"]
 CMD ["--help"]

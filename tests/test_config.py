@@ -1,6 +1,7 @@
 """Comprehensive tests for configuration loading."""
 
 import os
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -67,10 +68,33 @@ class TestLoadSettings:
     def test_load_settings_calls_dotenv_if_available(self):
         """load_settings should call load_dotenv if available."""
         mock_load_dotenv = mock.Mock()
-        with mock.patch("kernagent.config.load_dotenv", mock_load_dotenv):
+        with mock.patch("kernagent.config.load_dotenv", mock_load_dotenv), \
+             mock.patch("os.path.exists", return_value=True):
             settings = load_settings()
             mock_load_dotenv.assert_called_once()
             assert isinstance(settings, Settings)
+
+    def test_load_settings_prefers_kernagent_config_env_var(self, monkeypatch):
+        """load_settings should respect KERNAGENT_CONFIG override."""
+        config_path = "/tmp/custom/config.env"
+        mock_load_dotenv = mock.Mock()
+        monkeypatch.setenv("KERNAGENT_CONFIG", config_path)
+        with mock.patch("kernagent.config.load_dotenv", mock_load_dotenv), \
+             mock.patch("os.path.exists", return_value=True):
+            load_settings()
+        mock_load_dotenv.assert_called_once_with(config_path)
+
+    def test_load_settings_falls_back_to_xdg_config_home(self, monkeypatch):
+        """load_settings should default to ${XDG_CONFIG_HOME}/kernagent/config.env."""
+        monkeypatch.delenv("KERNAGENT_CONFIG", raising=False)
+        config_home = "/tmp/test-config"
+        monkeypatch.setenv("XDG_CONFIG_HOME", config_home)
+        mock_load_dotenv = mock.Mock()
+        expected_path = str(Path(config_home) / "kernagent" / "config.env")
+        with mock.patch("kernagent.config.load_dotenv", mock_load_dotenv), \
+             mock.patch("os.path.exists", return_value=True):
+            load_settings()
+        mock_load_dotenv.assert_called_once_with(expected_path)
 
     def test_load_settings_works_without_dotenv(self):
         """load_settings should work without python-dotenv installed."""

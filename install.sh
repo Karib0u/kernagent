@@ -2,521 +2,510 @@
 
 set -e
 
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # Configuration
 IMAGE_NAME="kernagent"
-INSTALL_DIR="/usr/local/bin"
+DOCKER_REGISTRY="ghcr.io/karib0u"
+INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 WRAPPER_NAME="kernagent"
-DOCKER_REGISTRY="ghcr.io/karib0u"  # GitHub Container Registry
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+CONFIG_DIR="${CONFIG_HOME}/kernagent"
+CONFIG_FILE="${CONFIG_DIR}/config.env"
 
-# Interactive menu function with arrow key navigation
-select_option() {
+# Global variable for model selection result
+SELECTED_MODEL=""
+
+# Helper functions
+error() {
+    echo -e "${RED}✗ Error: $1${NC}" >&2
+    exit 1
+}
+
+success() {
+    echo -e "${GREEN}✓ $1${NC}"
+}
+
+info() {
+    echo -e "${CYAN}$1${NC}"
+}
+
+warn() {
+    echo -e "${YELLOW}⚠ $1${NC}"
+}
+
+step() {
+    echo -e "\n${BLUE}[$1/$2]${NC} $3"
+}
+
+prompt_yn() {
     local prompt="$1"
-    shift
-    local options=("$@")
-    local selected=0
-    local num_options=${#options[@]}
-
-    # Hide cursor
-    tput civis
-
-    # Function to draw menu
-    draw_menu() {
-        echo -e "${BOLD}${prompt}${NC}"
-        echo ""
-        for i in "${!options[@]}"; do
-            if [ $i -eq $selected ]; then
-                echo -e "  ${GREEN}▶ ${options[$i]}${NC}"
-            else
-                echo -e "    ${options[$i]}"
-            fi
-        done
-    }
-
-    # Draw initial menu
-    draw_menu
-
-    # Read arrow keys
-    while true; do
-        read -rsn1 key
-
-        # Handle multi-byte sequences (arrow keys)
-        if [[ $key == $'\x1b' ]]; then
-            read -rsn2 key
-        fi
-
-        case "$key" in
-            '[A') # Up arrow
-                ((selected--))
-                if [ $selected -lt 0 ]; then
-                    selected=$((num_options - 1))
-                fi
-                ;;
-            '[B') # Down arrow
-                ((selected++))
-                if [ $selected -ge $num_options ]; then
-                    selected=0
-                fi
-                ;;
-            '') # Enter key
-                break
-                ;;
-        esac
-
-        # Clear previous menu and redraw
-        for ((i=0; i<num_options+2; i++)); do
-            tput cuu1
-            tput el
-        done
-        draw_menu
-    done
-
-    # Show cursor again
-    tput cnorm
-
-    # Clear menu
-    for ((i=0; i<num_options+2; i++)); do
-        tput cuu1
-        tput el
-    done
-
-    # Return selected index
-    echo "$selected"
-}
-
-# Function to confirm or modify installation directory
-confirm_install_dir() {
-    echo ""
-    echo -e "${CYAN}Installation Directory Configuration${NC}"
-    echo -e "Default installation directory: ${BOLD}${INSTALL_DIR}${NC}"
-    echo ""
-
-    local options=("Use default (${INSTALL_DIR})" "Choose a different directory")
-    local choice=$(select_option "Select installation directory option:" "${options[@]}")
-
-    if [ "$choice" -eq 1 ]; then
-        echo ""
-        echo -e "${YELLOW}Enter custom installation directory:${NC}"
-        read -e -p "> " custom_dir
-
-        # Expand tilde
-        custom_dir="${custom_dir/#\~/$HOME}"
-
-        # Validate and create if needed
-        if [ ! -d "$custom_dir" ]; then
-            echo -e "${YELLOW}Directory does not exist. Create it? (y/n)${NC}"
-            read -r response
-            if [[ "$response" =~ ^[Yy]$ ]]; then
-                mkdir -p "$custom_dir" || {
-                    echo -e "${RED}✗ Failed to create directory${NC}"
-                    exit 1
-                }
-                echo -e "${GREEN}✓ Directory created${NC}"
-            else
-                echo -e "${RED}✗ Installation cancelled${NC}"
-                exit 1
-            fi
-        fi
-
-        INSTALL_DIR="$custom_dir"
-    fi
-
-    echo -e "${GREEN}✓ Installation directory: ${INSTALL_DIR}${NC}"
-    echo ""
-}
-
-# Function to configure LLM provider
-configure_provider() {
-    echo ""
-    echo -e "${CYAN}LLM Provider Configuration${NC}"
-    echo ""
-
-    local providers=("OpenAI (GPT-4, GPT-3.5)" "Google (Gemini)" "Anthropic (Claude)" "Local (LM Studio, Ollama, etc.)" "Custom (Other provider)")
-    local provider_choice=$(select_option "Select your LLM provider:" "${providers[@]}")
-
-    local provider_name=""
-    local base_url=""
-    local api_key=""
-    local model=""
-
-    case $provider_choice in
-        0) # OpenAI
-            provider_name="OpenAI"
-            base_url="https://api.openai.com/v1"
-            echo -e "${GREEN}✓ Selected: OpenAI${NC}"
-            echo ""
-            echo -e "${YELLOW}Enter your OpenAI API key:${NC}"
-            echo -e "${CYAN}(Get your key from: https://platform.openai.com/api-keys)${NC}"
-            read -p "> " api_key
-            echo ""
-            echo -e "${YELLOW}Enter the model name:${NC}"
-            echo -e "${CYAN}(Examples: gpt-4o, gpt-4-turbo, gpt-3.5-turbo)${NC}"
-            read -p "> " model
-            ;;
-        1) # Google
-            provider_name="Google"
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-            echo -e "${GREEN}✓ Selected: Google (Gemini)${NC}"
-            echo ""
-            echo -e "${YELLOW}Enter your Google AI API key:${NC}"
-            echo -e "${CYAN}(Get your key from: https://aistudio.google.com/app/apikey)${NC}"
-            read -p "> " api_key
-            echo ""
-            echo -e "${YELLOW}Enter the model name:${NC}"
-            echo -e "${CYAN}(Examples: gemini-1.5-pro, gemini-1.5-flash, gemini-2.0-flash-exp)${NC}"
-            read -p "> " model
-            ;;
-        2) # Anthropic
-            provider_name="Anthropic"
-            base_url="https://api.anthropic.com/v1"
-            echo -e "${GREEN}✓ Selected: Anthropic (Claude)${NC}"
-            echo ""
-            echo -e "${YELLOW}Enter your Anthropic API key:${NC}"
-            echo -e "${CYAN}(Get your key from: https://console.anthropic.com/settings/keys)${NC}"
-            read -p "> " api_key
-            echo ""
-            echo -e "${YELLOW}Enter the model name:${NC}"
-            echo -e "${CYAN}(Examples: claude-3-5-sonnet-20241022, claude-3-opus-20240229)${NC}"
-            read -p "> " model
-            ;;
-        3) # Local
-            provider_name="Local"
-            echo -e "${GREEN}✓ Selected: Local LLM${NC}"
-            echo ""
-            echo -e "${CYAN}${BOLD}Important:${NC}${CYAN} Since kernagent runs in a Docker container, you need to use${NC}"
-            echo -e "${CYAN}a special URL to connect to services on your host machine.${NC}"
-            echo ""
-            echo -e "${YELLOW}Enter the base URL for your local LLM:${NC}"
-            echo -e "${CYAN}Default: http://host.docker.internal:1234/v1${NC}"
-            echo -e "${CYAN}(Press Enter to use default, or type your custom URL)${NC}"
-            read -p "> " custom_url
-
-            if [ -z "$custom_url" ]; then
-                base_url="http://host.docker.internal:1234/v1"
-            else
-                base_url="$custom_url"
-            fi
-
-            echo ""
-            echo -e "${YELLOW}Enter API key (optional, press Enter to skip):${NC}"
-            echo -e "${CYAN}(Most local LLMs don't require an API key)${NC}"
-            read -p "> " api_key
-
-            if [ -z "$api_key" ]; then
-                api_key="not-needed"
-            fi
-
-            echo ""
-            echo -e "${YELLOW}Enter the model name:${NC}"
-            echo -e "${CYAN}(Use the exact name from your local LLM server)${NC}"
-            echo -e "${CYAN}(Examples: llama-3.2-3b-instruct, qwen2.5-coder:7b)${NC}"
-            read -p "> " model
-            ;;
-        4) # Custom
-            provider_name="Custom"
-            echo -e "${GREEN}✓ Selected: Custom Provider${NC}"
-            echo ""
-            echo -e "${YELLOW}Enter the base URL (OpenAI-compatible endpoint):${NC}"
-            echo -e "${CYAN}(Must support /v1/chat/completions endpoint)${NC}"
-            read -p "> " base_url
-            echo ""
-            echo -e "${YELLOW}Enter your API key:${NC}"
-            read -p "> " api_key
-            echo ""
-            echo -e "${YELLOW}Enter the model name:${NC}"
-            read -p "> " model
-            ;;
-    esac
-
-    # Create .env file
-    echo ""
-    echo -e "${BLUE}Creating configuration file...${NC}"
-    cat > .env << ENV_EOF
-# LLM Provider Configuration
-# Provider: ${provider_name}
-OPENAI_API_KEY=${api_key}
-OPENAI_BASE_URL=${base_url}
-OPENAI_MODEL=${model}
-
-# Debug mode (set to "true" to enable verbose logging)
-DEBUG=false
-ENV_EOF
-
-    echo -e "${GREEN}✓ Configuration saved to .env${NC}"
-    echo ""
-    echo -e "${CYAN}Configuration Summary:${NC}"
-    echo -e "  Provider:  ${BOLD}${provider_name}${NC}"
-    echo -e "  Base URL:  ${base_url}"
-    echo -e "  Model:     ${model}"
-    echo ""
-}
-
-echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║    kernagent Installation Script      ║${NC}"
-echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
-echo ""
-
-# Check if we're in the kernagent repository
-REPO_URL="https://github.com/Karib0u/kernagent.git"
-TEMP_DIR=""
-
-if [ ! -f "Dockerfile" ] || [ ! -f "docker-compose.yml" ]; then
-    echo -e "${YELLOW}⚠ Not in kernagent repository, cloning...${NC}"
-    TEMP_DIR=$(mktemp -d)
-    echo "Cloning kernagent to ${TEMP_DIR}..."
-
-    if ! command -v git &> /dev/null; then
-        echo -e "${RED}✗ Git is not installed!${NC}"
-        echo "Please install git or clone the repository manually:"
-        echo "  git clone ${REPO_URL}"
-        echo "  cd kernagent"
-        echo "  bash install.sh"
-        exit 1
-    fi
-
-    git clone "${REPO_URL}" "${TEMP_DIR}" || {
-        echo -e "${RED}✗ Failed to clone repository${NC}"
-        exit 1
-    }
-
-    cd "${TEMP_DIR}" || {
-        echo -e "${RED}✗ Failed to enter repository directory${NC}"
-        exit 1
-    }
-    echo -e "${GREEN}✓ Repository cloned${NC}"
-fi
-
-# Check if Docker is installed
-echo -e "${BLUE}[1/6]${NC} Checking for Docker..."
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}✗ Docker is not installed!${NC}"
-    echo "Please install Docker first: https://docs.docker.com/get-docker/"
-    exit 1
-fi
-echo -e "${GREEN}✓ Docker found${NC}"
-
-# Check if Docker daemon is running
-echo -e "${BLUE}[2/7]${NC} Checking Docker daemon..."
-if ! docker info &> /dev/null; then
-    echo -e "${RED}✗ Docker daemon is not running!${NC}"
-    echo "Please start Docker and try again."
-    exit 1
-fi
-echo -e "${GREEN}✓ Docker daemon running${NC}"
-
-# Interactive installation directory selection
-confirm_install_dir
-
-# Build or pull the Docker image
-echo -e "${BLUE}[3/7]${NC} Setting up Docker image..."
-PULLED_FROM_REGISTRY=false
-
-if [ -n "$DOCKER_REGISTRY" ]; then
-    echo "Pulling pre-built image from registry..."
-    if docker pull "${DOCKER_REGISTRY}/${IMAGE_NAME}:latest"; then
-        # Successfully pulled from registry, tag it with local name
-        docker tag "${DOCKER_REGISTRY}/${IMAGE_NAME}:latest" "${IMAGE_NAME}:latest"
-        PULLED_FROM_REGISTRY=true
+    local default="${2:-n}"
+    local response
+    
+    if [[ "$default" == "y" ]]; then
+        read -r -p "$(echo -e ${YELLOW}${prompt} [Y/n]:${NC} )" response
+        [[ -z "$response" || "$response" =~ ^[Yy]$ ]]
     else
-        # Pull failed, build locally instead
-        echo -e "${YELLOW}⚠ Pull failed, building locally instead...${NC}"
-        docker build -t "${IMAGE_NAME}:latest" .
+        read -r -p "$(echo -e ${YELLOW}${prompt} [y/N]:${NC} )" response
+        [[ "$response" =~ ^[Yy]$ ]]
+    fi
+}
+
+prompt_input() {
+    local prompt="$1"
+    local default="$2"
+    local value
+    
+    if [[ -n "$default" ]]; then
+        read -r -p "$(echo -e ${CYAN}${prompt} [${default}]:${NC} )" value
+        echo "${value:-$default}"
+    else
+        while true; do
+            read -r -p "$(echo -e ${CYAN}${prompt}:${NC} )" value
+            [[ -n "$value" ]] && echo "$value" && return 0
+            warn "Input cannot be empty"
+        done
+    fi
+}
+
+# Fetch and display models from OpenAI-compatible endpoint
+# Stores result in global SELECTED_MODEL variable
+select_model_from_api() {
+    local base_url="$1"
+    local api_key="$2"
+    local example_models="$3"
+    local default_model="$4"
+    
+    SELECTED_MODEL=""
+    
+    # Convert host.docker.internal to localhost for discovery
+    local query_url="${base_url}"
+    if [[ "$query_url" == *"host.docker.internal"* ]] || [[ "$query_url" == *"host.containers.internal"* ]]; then
+        query_url="${query_url//host.docker.internal/localhost}"
+        query_url="${query_url//host.containers.internal/localhost}"
+        info "Using localhost for model discovery (kernagent will use ${base_url})"
+    fi
+    
+    local models_endpoint="${query_url%/}/models"
+    local models=()
+    
+    # Check requirements
+    if ! command -v curl &>/dev/null; then
+        warn "curl not found, skipping auto-detection"
+        if [[ -n "$example_models" ]]; then
+            info "Examples: ${example_models}"
+        fi
+        SELECTED_MODEL=$(prompt_input "Enter model name" "$default_model")
+        return 0
+    fi
+    
+    # Create temp file
+    local tmp_file
+    tmp_file=$(mktemp 2>/dev/null) || {
+        warn "Cannot create temp file"
+        SELECTED_MODEL=$(prompt_input "Enter model name" "$default_model")
+        return 0
+    }
+    
+    # Prepare curl command with HTTP code output
+    local curl_args=(-sS -w "%{http_code}" -o "$tmp_file" --max-time 10 -H "Content-Type: application/json")
+    if [[ -n "$api_key" && "$api_key" != "not-needed" ]]; then
+        curl_args+=(-H "Authorization: Bearer ${api_key}")
+    fi
+    curl_args+=("$models_endpoint")
+    
+    # Fetch models
+    info "Querying for available models..."
+    local http_code
+    http_code=$(curl "${curl_args[@]}" 2>/dev/null || echo "000")
+    
+    if [[ "$http_code" != "200" ]] || [[ ! -s "$tmp_file" ]]; then
+        warn "Model listing failed (HTTP ${http_code})"
+        rm -f "$tmp_file"
+        if [[ -n "$example_models" ]]; then
+            info "Examples: ${example_models}"
+        fi
+        SELECTED_MODEL=$(prompt_input "Enter model name" "$default_model")
+        return 0
+    fi
+    
+    # Parse models from JSON
+    local parsed_models=""
+    
+    # Try with Python first (most reliable)
+    if command -v python3 &>/dev/null || command -v python &>/dev/null; then
+        local python_bin=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+        parsed_models=$("$python_bin" <<PY "$tmp_file"
+import json, sys
+try:
+    with open(sys.argv[1], 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    models = data.get('data', [])
+    for m in models:
+        if isinstance(m, dict) and 'id' in m:
+            print(m['id'].strip())
+except:
+    pass
+PY
+)
+    fi
+    
+    # Fallback to grep/sed if Python failed
+    if [[ -z "$parsed_models" ]]; then
+        parsed_models=$(grep -o '"id"[[:space:]]*:[[:space:]]*"[^"]*"' "$tmp_file" 2>/dev/null | sed 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo "")
+    fi
+    
+    rm -f "$tmp_file"
+    
+    # Store models in array
+    while IFS= read -r line; do
+        line=$(echo "$line" | xargs)  # Trim whitespace
+        [[ -n "$line" ]] && models+=("$line")
+    done <<< "$parsed_models"
+    
+    if [[ ${#models[@]} -eq 0 ]]; then
+        warn "No models found in response"
+        if [[ -n "$example_models" ]]; then
+            info "Examples: ${example_models}"
+        fi
+        SELECTED_MODEL=$(prompt_input "Enter model name" "$default_model")
+        return 0
+    fi
+    
+    # Display models with pagination
+    echo ""
+    success "Found ${#models[@]} model(s)"
+    
+    local page_size=20
+    local current_page=0
+    local total_pages=$(( (${#models[@]} + page_size - 1) / page_size ))
+    
+    while true; do
+        local start_idx=$((current_page * page_size))
+        local end_idx=$((start_idx + page_size))
+        [[ $end_idx -gt ${#models[@]} ]] && end_idx=${#models[@]}
+        
+        echo ""
+        echo -e "${CYAN}Showing models $((start_idx + 1))-${end_idx} of ${#models[@]}${NC}"
+        echo ""
+        
+        for ((i=start_idx; i<end_idx; i++)); do
+            printf "  ${CYAN}%2d)${NC} %s\n" "$((i + 1))" "${models[$i]}"
+        done
+        
+        echo ""
+        if [[ $end_idx -lt ${#models[@]} ]]; then
+            echo -e "${YELLOW}[n] Next page  |  [p] Previous page  |  [number] Select  |  [text] Enter model name${NC}"
+        else
+            if [[ $current_page -gt 0 ]]; then
+                echo -e "${YELLOW}[p] Previous page  |  [number] Select  |  [text] Enter model name${NC}"
+            else
+                echo -e "${YELLOW}[number] Select model  |  [text] Enter model name${NC}"
+            fi
+        fi
+        
+        local selection=""
+        read -r -p "> " selection
+        selection=$(echo "$selection" | xargs | tr '[:upper:]' '[:lower:]')
+        
+        if [[ -z "$selection" ]]; then
+            warn "Selection cannot be empty"
+            continue
+        fi
+        
+        # Handle pagination commands
+        if [[ "$selection" == "n" ]] || [[ "$selection" == "next" ]]; then
+            if [[ $end_idx -lt ${#models[@]} ]]; then
+                ((current_page++))
+                continue
+            else
+                warn "Already on last page"
+                continue
+            fi
+        fi
+        
+        if [[ "$selection" == "p" ]] || [[ "$selection" == "prev" ]] || [[ "$selection" == "previous" ]]; then
+            if [[ $current_page -gt 0 ]]; then
+                ((current_page--))
+                continue
+            else
+                warn "Already on first page"
+                continue
+            fi
+        fi
+        
+        # Check if numeric selection
+        if [[ "$selection" =~ ^[0-9]+$ ]]; then
+            local idx=$((selection - 1))
+            if [[ $idx -ge 0 && $idx -lt ${#models[@]} ]]; then
+                SELECTED_MODEL="${models[$idx]}"
+                return 0
+            else
+                warn "Enter a number between 1 and ${#models[@]}"
+                continue
+            fi
+        fi
+        
+        # Manual entry
+        SELECTED_MODEL="$selection"
+        return 0
+    done
+}
+
+# Header
+echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
+echo -e "${BLUE}║      kernagent Installation            ║${NC}"
+echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
+
+# Step 1: Check Docker
+step 1 5 "Checking Docker..."
+command -v docker &>/dev/null || error "Docker not found. Install from: https://docs.docker.com/get-docker/"
+docker info &>/dev/null || error "Docker daemon not running. Please start Docker."
+success "Docker ready"
+
+# Step 2: Get repository
+step 2 5 "Preparing repository..."
+if [[ ! -f "Dockerfile" ]]; then
+    command -v git &>/dev/null || error "Git not found. Please install git or clone manually."
+    
+    TEMP_DIR=$(mktemp -d)
+    info "Cloning to ${TEMP_DIR}..."
+    git clone --quiet "https://github.com/Karib0u/kernagent.git" "${TEMP_DIR}" || error "Failed to clone repository"
+    cd "${TEMP_DIR}"
+    trap "cd / && rm -rf '${TEMP_DIR}'" EXIT
+fi
+success "Repository ready"
+
+# Step 3: Build/Pull image
+step 3 5 "Setting up Docker image..."
+HOST_ARCH=$(docker info --format '{{.Architecture}}' 2>/dev/null | tr '[:upper:]' '[:lower:]')
+
+if [[ "$HOST_ARCH" =~ ^(amd64|x86_64)$ ]]; then
+    info "Pulling pre-built image..."
+    if docker pull "${DOCKER_REGISTRY}/${IMAGE_NAME}:latest" &>/dev/null; then
+        docker tag "${DOCKER_REGISTRY}/${IMAGE_NAME}:latest" "${IMAGE_NAME}:latest"
+        success "Image pulled from registry"
+    else
+        warn "Pull failed, building locally..."
+        docker build -q -t "${IMAGE_NAME}:latest" . || error "Docker build failed"
+        success "Image built locally"
     fi
 else
-    echo "Building Docker image (this may take several minutes)..."
-    docker build -t "${IMAGE_NAME}:latest" .
+    info "Building for ${HOST_ARCH} architecture..."
+    docker build -q -t "${IMAGE_NAME}:latest" . || error "Docker build failed"
+    success "Image built for ${HOST_ARCH}"
 fi
 
-echo -e "${GREEN}✓ Docker image ready${NC}"
+# Step 4: Install CLI wrapper
+step 4 5 "Installing CLI wrapper..."
 
-# Create CLI wrapper script
-echo -e "${BLUE}[4/7]${NC} Creating CLI wrapper..."
-WRAPPER_SCRIPT=$(cat << 'WRAPPER_EOF'
+# Confirm install directory
+if prompt_yn "Install to ${INSTALL_DIR}?" "y"; then
+    :
+else
+    INSTALL_DIR=$(prompt_input "Enter installation directory" "$HOME/.local/bin")
+    mkdir -p "$INSTALL_DIR" || error "Failed to create directory"
+fi
+
+# Create wrapper
+cat > "/tmp/${WRAPPER_NAME}" << 'WRAPPER_EOF'
 #!/usr/bin/env bash
-
-# kernagent - Docker-based binary analysis CLI
-# This wrapper transparently runs kernagent in a Docker container
-
 set -e
 
 IMAGE_NAME="kernagent"
-DOCKER_REGISTRY="ghcr.io/karib0u"  # GitHub Container Registry
+DOCKER_REGISTRY="ghcr.io/karib0u"
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+CONFIG_FILE="${KERNAGENT_CONFIG:-${CONFIG_HOME}/kernagent/config.env}"
+CONFIG_FILE="${CONFIG_FILE/#\~/$HOME}"
+CONTAINER_CONFIG_PATH="/config/config.env"
 
-# Colors
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-# Check if Docker is running
-if ! docker info &> /dev/null 2>&1; then
-    echo -e "${RED}Error: Docker daemon is not running${NC}" >&2
-    echo "Please start Docker and try again." >&2
+# Check Docker
+docker info &>/dev/null 2>&1 || {
+    echo "Error: Docker daemon not running" >&2
     exit 1
+}
+
+# Check image
+if ! docker image inspect "${IMAGE_NAME}" &>/dev/null; then
+    echo "Pulling ${IMAGE_NAME}..." >&2
+    docker pull "${DOCKER_REGISTRY}/${IMAGE_NAME}:latest" &>/dev/null && \
+    docker tag "${DOCKER_REGISTRY}/${IMAGE_NAME}:latest" "${IMAGE_NAME}" || {
+        echo "Error: Image not found. Run install script again." >&2
+        exit 1
+    }
 fi
 
-# Parse arguments to find binary path
+# Parse arguments for binary path
 BINARY_PATH=""
-DOCKER_ARGS=()
-KERNAGENT_ARGS=()
-
-# Collect environment variables
-ENV_ARGS=()
-if [ -n "$OPENAI_API_KEY" ]; then
-    ENV_ARGS+=("-e" "OPENAI_API_KEY=$OPENAI_API_KEY")
-fi
-if [ -n "$OPENAI_BASE_URL" ]; then
-    ENV_ARGS+=("-e" "OPENAI_BASE_URL=$OPENAI_BASE_URL")
-fi
-if [ -n "$OPENAI_MODEL" ]; then
-    ENV_ARGS+=("-e" "OPENAI_MODEL=$OPENAI_MODEL")
-fi
-
-# Load .env file if it exists in current directory
-if [ -f .env ]; then
-    ENV_ARGS+=("--env-file" ".env")
-fi
-
-# Parse arguments
 for arg in "$@"; do
-    # Check if this looks like a file path
-    if [ -f "$arg" ] || [[ "$arg" == *.exe ]] || [[ "$arg" == *.bin ]] || [[ "$arg" == *.dll ]] || [[ "$arg" == *.so ]] || [[ "$arg" == *.elf ]]; then
+    if [[ -f "$arg" ]] || [[ "$arg" =~ \.(exe|bin|dll|so|elf)$ ]]; then
         BINARY_PATH="$arg"
+        break
     fi
-    KERNAGENT_ARGS+=("$arg")
 done
 
-# Determine volume mount strategy
-if [ -n "$BINARY_PATH" ]; then
-    # Get absolute path of the binary
-    BINARY_ABS=$(cd "$(dirname "$BINARY_PATH")" && pwd)/$(basename "$BINARY_PATH")
-    BINARY_DIR=$(dirname "$BINARY_ABS")
-    BINARY_NAME=$(basename "$BINARY_ABS")
-
-    # Mount the directory containing the binary
+# Setup volume mounts
+if [[ -n "$BINARY_PATH" ]]; then
+    BINARY_ABS="$(cd "$(dirname "$BINARY_PATH")" && pwd)/$(basename "$BINARY_PATH")"
+    BINARY_DIR="$(dirname "$BINARY_ABS")"
+    BINARY_NAME="$(basename "$BINARY_ABS")"
     VOLUME_ARGS=("-v" "${BINARY_DIR}:/data")
-
-    # Replace the binary path in arguments with /data/filename
-    NEW_ARGS=()
-    for arg in "${KERNAGENT_ARGS[@]}"; do
-        if [ "$arg" == "$BINARY_PATH" ]; then
-            NEW_ARGS+=("/data/${BINARY_NAME}")
+    
+    # Update args with container path
+    ARGS=()
+    for arg in "$@"; do
+        if [[ "$arg" == "$BINARY_PATH" ]]; then
+            ARGS+=("/data/${BINARY_NAME}")
         else
-            NEW_ARGS+=("$arg")
+            ARGS+=("$arg")
         fi
     done
-    KERNAGENT_ARGS=("${NEW_ARGS[@]}")
 else
-    # No binary path detected, mount current directory
     VOLUME_ARGS=("-v" "$(pwd):/data")
+    ARGS=("$@")
 fi
 
-# Check if image exists locally, otherwise try to pull from registry
-if ! docker image inspect "${IMAGE_NAME}" &> /dev/null; then
-    if [ -n "$DOCKER_REGISTRY" ]; then
-        echo -e "${YELLOW}Local image not found, attempting to pull from ${DOCKER_REGISTRY}...${NC}" >&2
-        if docker pull "${DOCKER_REGISTRY}/${IMAGE_NAME}:latest" &> /dev/null; then
-            docker tag "${DOCKER_REGISTRY}/${IMAGE_NAME}:latest" "${IMAGE_NAME}"
-        else
-            echo -e "${RED}Failed to pull image from registry${NC}" >&2
-            echo "Run the install script again or build manually with: docker build -t ${IMAGE_NAME} ." >&2
-            exit 1
-        fi
-    else
-        echo -e "${YELLOW}Warning: kernagent Docker image not found${NC}" >&2
-        echo "Run the install script again or build manually with: docker build -t ${IMAGE_NAME} ." >&2
-        exit 1
-    fi
+# Mount shared config if available
+if [[ -f "$CONFIG_FILE" ]]; then
+    VOLUME_ARGS+=("-v" "${CONFIG_FILE}:${CONTAINER_CONFIG_PATH}:ro")
+else
+    echo "Warning: kernagent config not found at ${CONFIG_FILE}" >&2
 fi
 
-# Run the Docker container
+# Environment variables
+ENV_ARGS=()
+[[ -n "$OPENAI_API_KEY" ]] && ENV_ARGS+=("-e" "OPENAI_API_KEY=$OPENAI_API_KEY")
+[[ -n "$OPENAI_BASE_URL" ]] && ENV_ARGS+=("-e" "OPENAI_BASE_URL=$OPENAI_BASE_URL")
+[[ -n "$OPENAI_MODEL" ]] && ENV_ARGS+=("-e" "OPENAI_MODEL=$OPENAI_MODEL")
+[[ -f "$CONFIG_FILE" ]] && ENV_ARGS+=("-e" "KERNAGENT_CONFIG=${CONTAINER_CONFIG_PATH}")
+
+# Run container
 exec docker run --rm \
     "${VOLUME_ARGS[@]}" \
     "${ENV_ARGS[@]}" \
     "${IMAGE_NAME}" \
-    "${KERNAGENT_ARGS[@]}"
+    "${ARGS[@]}"
 WRAPPER_EOF
-)
 
-# Write wrapper to temp file
-TMP_WRAPPER="/tmp/${WRAPPER_NAME}-$$"
-echo "$WRAPPER_SCRIPT" > "$TMP_WRAPPER"
-chmod +x "$TMP_WRAPPER"
-echo -e "${GREEN}✓ CLI wrapper created${NC}"
+chmod +x "/tmp/${WRAPPER_NAME}"
 
 # Install wrapper
-echo -e "${BLUE}[5/7]${NC} Installing to ${INSTALL_DIR}/${WRAPPER_NAME}..."
-if [ -w "$INSTALL_DIR" ]; then
-    mv "$TMP_WRAPPER" "${INSTALL_DIR}/${WRAPPER_NAME}"
+if [[ -w "$INSTALL_DIR" ]]; then
+    mv "/tmp/${WRAPPER_NAME}" "${INSTALL_DIR}/${WRAPPER_NAME}"
 else
-    echo "Need sudo permission to install to ${INSTALL_DIR}..."
-    sudo mv "$TMP_WRAPPER" "${INSTALL_DIR}/${WRAPPER_NAME}"
+    sudo mv "/tmp/${WRAPPER_NAME}" "${INSTALL_DIR}/${WRAPPER_NAME}"
     sudo chmod +x "${INSTALL_DIR}/${WRAPPER_NAME}"
 fi
-echo -e "${GREEN}✓ Installed to ${INSTALL_DIR}/${WRAPPER_NAME}${NC}"
 
-# Setup configuration
-echo -e "${BLUE}[6/7]${NC} LLM Configuration..."
-if [ ! -f .env ]; then
-    configure_provider
-else
-    echo ""
-    echo -e "${YELLOW}Existing .env file found. Would you like to reconfigure? (y/N)${NC}"
-    read -r response
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-        configure_provider
+success "Installed to ${INSTALL_DIR}/${WRAPPER_NAME}"
+
+# Step 5: Configure LLM
+step 5 5 "LLM Configuration"
+
+if [[ -f "$CONFIG_FILE" ]]; then
+    info "Existing config found at ${CONFIG_FILE}"
+    if ! prompt_yn "Reconfigure LLM settings?" "n"; then
+        success "Using existing configuration"
+        SKIP_CONFIG=true
+    fi
+fi
+
+if [[ "$SKIP_CONFIG" != "true" ]]; then
+    if prompt_yn "Configure LLM provider now?" "y"; then
+        echo ""
+        info "Select provider:"
+        echo "  1) OpenAI (GPT-4)"
+        echo "  2) Google (Gemini)"
+        echo "  3) Anthropic (Claude)"
+        echo "  4) Local (LM Studio/Ollama)"
+        echo "  5) Custom OpenAI-compatible"
+        echo "  6) Skip (configure later)"
+        
+        read -r -p "> " choice
+        
+        case "$choice" in
+            1)
+                API_KEY=$(prompt_input "OpenAI API key")
+                BASE_URL="https://api.openai.com/v1"
+                select_model_from_api "$BASE_URL" "$API_KEY" "gpt-4o, gpt-4o-mini, gpt-3.5-turbo" "gpt-4o"
+                MODEL="$SELECTED_MODEL"
+                ;;
+            2)
+                API_KEY=$(prompt_input "Google AI API key")
+                BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai/"
+                select_model_from_api "$BASE_URL" "$API_KEY" "gemini-2.0-flash-exp, gemini-1.5-pro, gemini-1.5-flash" "gemini-2.0-flash-exp"
+                MODEL="$SELECTED_MODEL"
+                ;;
+            3)
+                API_KEY=$(prompt_input "Anthropic API key")
+                BASE_URL="https://api.anthropic.com/v1"
+                select_model_from_api "$BASE_URL" "$API_KEY" "claude-3-5-sonnet-20241022, claude-3-opus-20240229" "claude-3-5-sonnet-20241022"
+                MODEL="$SELECTED_MODEL"
+                ;;
+            4)
+                BASE_URL=$(prompt_input "Base URL" "http://host.docker.internal:1234/v1")
+                API_KEY=$(prompt_input "API key (leave empty if not needed)" "not-needed")
+                [[ -z "$API_KEY" ]] && API_KEY="not-needed"
+                select_model_from_api "$BASE_URL" "$API_KEY" "llama-3.2-3b-instruct, qwen2.5-coder:7b" "llama-3.2-3b-instruct"
+                MODEL="$SELECTED_MODEL"
+                ;;
+            5)
+                BASE_URL=$(prompt_input "Base URL (must support /v1/chat/completions)")
+                API_KEY=$(prompt_input "API key")
+                select_model_from_api "$BASE_URL" "$API_KEY" "" ""
+                MODEL="$SELECTED_MODEL"
+                ;;
+            *)
+                warn "Skipping configuration"
+                SKIP_CONFIG=true
+                ;;
+        esac
+        
+        if [[ "$SKIP_CONFIG" != "true" ]]; then
+            mkdir -p "${CONFIG_DIR}"
+            cat > "${CONFIG_FILE}" << EOF
+OPENAI_API_KEY=${API_KEY}
+OPENAI_BASE_URL=${BASE_URL}
+OPENAI_MODEL=${MODEL}
+DEBUG=false
+EOF
+            success "Configuration saved to ${CONFIG_FILE}"
+            info "Set KERNAGENT_CONFIG=${CONFIG_FILE} to override the default path."
+        fi
     else
-        echo -e "${GREEN}✓ Using existing configuration${NC}"
+        info "You can create ${CONFIG_FILE} manually later"
     fi
 fi
 
 # Final verification
-echo -e "${BLUE}[7/7]${NC} Verifying installation..."
-if command -v "${WRAPPER_NAME}" &> /dev/null || [ -x "${INSTALL_DIR}/${WRAPPER_NAME}" ]; then
-    echo -e "${GREEN}✓ kernagent is ready to use${NC}"
-else
-    echo -e "${YELLOW}⚠ Note: You may need to add ${INSTALL_DIR} to your PATH${NC}"
-    echo -e "${YELLOW}  Add this to your ~/.bashrc or ~/.zshrc:${NC}"
-    echo -e "${YELLOW}  export PATH=\"${INSTALL_DIR}:\$PATH\"${NC}"
+if ! command -v "${WRAPPER_NAME}" &>/dev/null && [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
+    warn "Add to PATH: export PATH=\"${INSTALL_DIR}:\$PATH\""
 fi
 
-# Success message
+# Success
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  Installation completed successfully!  ║${NC}"
+echo -e "${GREEN}║    Installation Complete! 🎉           ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${CYAN}${BOLD}Installation Summary:${NC}"
-echo -e "  Installed to:  ${BOLD}${INSTALL_DIR}/${WRAPPER_NAME}${NC}"
-if [ -f .env ]; then
-    echo -e "  Configuration: ${BOLD}.env file created${NC}"
-fi
-echo ""
-echo -e "${CYAN}${BOLD}Quick Start:${NC}"
+echo -e "${BOLD}Quick Start:${NC}"
 echo "  ${WRAPPER_NAME} --help"
-echo "  ${WRAPPER_NAME} summary /path/to/binary.exe"
-echo "  ${WRAPPER_NAME} ask /path/to/binary.exe \"What does this do?\""
-echo "  ${WRAPPER_NAME} oneshot /path/to/sample.bin"
+echo "  ${WRAPPER_NAME} summary binary.exe"
+echo "  ${WRAPPER_NAME} ask binary.exe \"What does this do?\""
 echo ""
-echo -e "${CYAN}${BOLD}How it works:${NC}"
-echo "  • Runs in a Docker container with Ghidra pre-installed"
-echo "  • Automatically mounts directories containing your binaries"
-echo "  • Loads configuration from .env files in your working directory"
-echo "  • Connects to your configured LLM provider"
-echo ""
-echo -e "${YELLOW}Tip: You can place a .env file in any directory where you work with binaries${NC}"
-
-# Cleanup temporary directory if created
-if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo -e "${CYAN}Tip: Create ${CONFIG_FILE} with:${NC}"
+    echo "  OPENAI_API_KEY=your-key"
+    echo "  OPENAI_BASE_URL=https://api.openai.com/v1"
+    echo "  OPENAI_MODEL=gpt-4o"
     echo ""
-    echo "Cleaning up temporary files..."
-    cd /
-    rm -rf "$TEMP_DIR"
+    echo "Then rerun ${WRAPPER_NAME} commands (the file will be mounted into the container)."
 fi

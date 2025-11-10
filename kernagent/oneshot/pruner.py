@@ -164,6 +164,13 @@ def _read_json(path: Path) -> Any:
         return json.load(fh)
 
 
+def _read_optional_json(path: Path) -> Any | None:
+    if not path.exists():
+        return None
+    with path.open("r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
 def _iter_jsonl(path: Path) -> Iterable[Dict[str, Any]]:
     if not path.exists():
         return
@@ -192,12 +199,73 @@ def _normalize_format(fmt: Optional[str]) -> str:
     if not fmt:
         return "unknown"
     fmt_lower = fmt.lower()
-    if "portable executable" in fmt_lower or fmt_lower.startswith("pe"):
+    if "portable executable" in fmt_lower or fmt_lower.startswith("pe") or "coff" in fmt_lower:
         return "pe"
     if "elf" in fmt_lower:
         return "elf"
     if "mach" in fmt_lower:
         return "mach-o"
+    return "unknown"
+
+
+def _rule_rank_for_capa(rule: Dict[str, Any]) -> int:
+    """Simple heuristic to rank CAPA rules in the oneshot summary."""
+
+    score = 0
+    attack = rule.get("attack") or []
+    mbc = rule.get("mbc") or []
+    score += min(len(attack), 3) * 5
+    score += min(len(mbc), 3) * 3
+    score += min(rule.get("match_count", 0), 10)
+    namespace = (rule.get("namespace") or "").lower()
+    if any(keyword in namespace for keyword in ("network", "process", "persistence", "credential", "crypto")):
+        score += 2
+    return score
+
+
+def _summarize_capa_for_oneshot(capa_summary: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Extract high-signal CAPA data for the oneshot payload."""
+
+    if not capa_summary:
+        return None
+
+    rules = capa_summary.get("rules") or []
+    if not rules:
+        return None
+
+    ranked = sorted(
+        rules,
+        key=lambda rule: (-_rule_rank_for_capa(rule), rule.get("namespace") or "", rule.get("name") or ""),
+    )[:8]
+
+    top_rules = []
+    for rule in ranked:
+        locations = rule.get("locations") or []
+        top_rules.append(
+            {
+                "name": rule.get("name"),
+                "namespace": rule.get("namespace"),
+                "scope": rule.get("scope"),
+                "description": rule.get("description"),
+                "first_location": locations[0] if locations else None,
+                "attack": rule.get("attack") or [],
+                "mbc": rule.get("mbc") or [],
+            }
+        )
+
+    highlights = capa_summary.get("highlights") or {}
+
+    return {
+        "counts": capa_summary.get("counts"),
+        "capa_version": capa_summary.get("capa_version"),
+        "rules_source": capa_summary.get("rules_source"),
+        "highlights": {
+            "top_attack_ids": highlights.get("top_attack_ids", []),
+            "top_tactics": highlights.get("top_tactics", []),
+            "top_namespaces": highlights.get("top_namespaces", []),
+        },
+        "top_rules": top_rules,
+    }
     if "coff" in fmt_lower:
         return "pe"
     return "unknown"
@@ -803,6 +871,12 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
     if verbose:
         logger.info("Found %d possible configuration strings", len(possible_configs))
 
+    capa_summary_path = archive_dir / "capa_summary.json"
+    capa_raw = _read_optional_json(capa_summary_path)
+    capa_highlights = _summarize_capa_for_oneshot(capa_raw)
+    if verbose and capa_highlights:
+        logger.info("Included CAPA highlights (%d rules)", capa_highlights["counts"]["rules"] if capa_highlights.get("counts") else 0)
+
     summary = {
         "file": file_info,
         "sections": section_summary,
@@ -825,6 +899,9 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
             },
         },
     }
+
+    if capa_highlights:
+        summary["capa"] = capa_highlights
 
     return summary
 

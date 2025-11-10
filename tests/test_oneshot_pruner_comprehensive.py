@@ -633,3 +633,20 @@ class TestBuildOneshotSummary:
             assert "ea" in func
             assert "name" in func
             assert "size_bytes" in func or "cyclomatic_complexity" in func
+
+    def test_summary_includes_capa_when_available(self, fixture_archive):
+        """CAPA highlights should be merged when capa_summary.json exists."""
+        summary = build_oneshot_summary(fixture_archive)
+        assert "capa" in summary
+        capa = summary["capa"]
+        assert capa["top_rules"], "Expected at least one CAPA rule highlight"
+        assert capa["counts"]["rules"] >= len(capa["top_rules"])
+
+    def test_summary_capa_highlights_shape(self, fixture_archive):
+        """CAPA highlights should expose top tactics and attack IDs."""
+        summary = build_oneshot_summary(fixture_archive)
+        capa = summary.get("capa")
+        assert capa is not None
+        highlights = capa.get("highlights") or {}
+        assert isinstance(highlights.get("top_attack_ids"), list)
+        assert isinstance(highlights.get("top_tactics"), list)

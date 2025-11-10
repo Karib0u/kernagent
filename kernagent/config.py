@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 try:
     from dotenv import load_dotenv
@@ -24,5 +25,14 @@ class Settings:
 def load_settings() -> Settings:
     """Load settings from environment (optionally via python-dotenv)."""
     if load_dotenv:
-        load_dotenv()
+        config_path = os.environ.get(
+            "KERNAGENT_CONFIG",
+            str(
+                Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+                / "kernagent"
+                / "config.env"
+            ),
+        )
+        if os.path.exists(config_path):
+            load_dotenv(config_path)
     return Settings()

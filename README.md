@@ -199,7 +199,7 @@ kernagent ask /path/to/binary.exe "What does this binary do?"
 kernagent oneshot /path/to/binary.exe
 ```
 
-> Requires Docker and Git. The wrapper mounts your binary directory into the container and forwards `OPENAI_*` env vars / `.env` automatically.
+> Requires Docker and Git. The wrapper mounts your binary directory into the container and forwards `OPENAI_*` env vars or anything inside `~/.config/kernagent/config.env` automatically.
 
 ### Windows Installation
 
@@ -211,8 +211,10 @@ kernagent oneshot /path/to/binary.exe
 ```powershell
 git clone https://github.com/Karib0u/kernagent.git
 cd kernagent
-cp .env.example .env
-# Edit .env with your API credentials
+# Configure once (see "Model Configuration" below for details)
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.config\kernagent" | Out-Null
+Copy-Item -Force config.env.example "$env:USERPROFILE\.config\kernagent\config.env"
+notepad "$env:USERPROFILE\.config\kernagent\config.env"
 docker compose build
 docker compose run --rm kernagent --help
 ```
@@ -243,14 +245,25 @@ curl -fsSL https://raw.githubusercontent.com/Karib0u/kernagent/main/install.sh |
 
 ## ⚙️ Model Configuration
 
-Configure via `.env` (recommended):
+All entrypoints (wrapper, docker compose, tests) load credentials from a single config file that lives outside the repo: `${XDG_CONFIG_HOME:-~/.config}/kernagent/config.env`. Create or edit it once and the file will be mounted into every container at `/config/config.env`.
 
 ```bash
-cp .env.example .env
-# edit with your values
+mkdir -p ~/.config/kernagent
+cp config.env.example ~/.config/kernagent/config.env
+$EDITOR ~/.config/kernagent/config.env
 ```
 
-or environment variables:
+PowerShell version:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.config\kernagent" | Out-Null
+Copy-Item -Force config.env.example "$env:USERPROFILE\.config\kernagent\config.env"
+notepad "$env:USERPROFILE\.config\kernagent\config.env"
+```
+
+Set `KERNAGENT_CONFIG=/path/to/your/config.env` if you want to override the default location.
+
+You can still override any value via regular environment variables:
 
 ```bash
 export OPENAI_API_KEY="sk-..."
@@ -265,7 +278,10 @@ Any `/v1/chat/completions`-compatible endpoint works.
 ## 🧱 Commands
 
 All commands operate on a **snapshot** (see “How it works”).
-If a `<name>_archive/` snapshot does not exist, `kernagent` will build it automatically.
+If a `<name>_archive/` snapshot does not exist, `kernagent` builds it automatically.
+That build orchestrates the bundled static analyzers (currently Ghidra-based
+snapshotting plus flare-capa) and drops their artifacts alongside each other,
+so capabilities and ATT&CK mappings are available without extra switches.
 
 ### `summary`
 
@@ -322,6 +338,7 @@ Flow:
    * up to 40 key functions with metrics, caps, callers/callees
    * candidate embedded configs
    * boolean suspicion flags
+   * CAPA rule highlights (namespaces, ATT&CK/MBC) when CAPA runs successfully
 2. Feed that JSON to a strict malware-analyst prompt.
 3. Emit a single Markdown report with:
 
@@ -336,12 +353,15 @@ You can also bypass the prompt and consume the JSON directly in your own tooling
 
 ## 🧬 How It Works
 
-`kernagent` packages the "export once, reason over structured data" approach into a headless pipeline:
-Ghidra runs in batch mode inside Docker to build the snapshot; all LLM/agent logic runs purely on that snapshot.
+`kernagent` packages the "export once, reason over structured data" approach into a headless pipeline.
+It can orchestrate multiple static analysis backends; today that means
+running Ghidra/PyGhidra to build a rich snapshot and flare-capa for rule
+coverage, and the architecture leaves room to plug in other disassemblers or
+specialized scanners without changing the CLI.
 
 ### 1. Snapshot extraction (once per binary)
 
-`kernagent.snapshot.extractor` runs Ghidra/PyGhidra and emits:
+`kernagent.snapshot.extractor` currently uses Ghidra/PyGhidra and emits:
 
 ```text
 <name>_archive/
@@ -355,6 +375,7 @@ Ghidra runs in batch mode inside Docker to build the snapshot; all LLM/agent log
 ├── data.jsonl           # globals / data items
 ├── index.json           # name ↔ ea map
 ├── data_index.json
+├── capa_summary.json    # CAPA hits + ATT&CK/MBC mappings (auto-generated)
 └── decomp/*.c           # decompiled functions
 ```
 
@@ -365,7 +386,7 @@ This snapshot is:
 
 ### 2. Tool surface
 
-`kernagent.snapshot.SnapshotTools` + the `TOOLS` schema expose safe, read-only operations used by the agent (and you):
+`kernagent.snapshot.SnapshotTools` + the `TOOLS` schema expose safe, read-only operations used by the agent (and you) across every static artifact the pipeline produces:
 
 * `read_json` – meta/sections/imports/etc.
 * `get_function_stats`
@@ -378,6 +399,7 @@ This snapshot is:
 * `search_equates`
 * `trace_calls`
 * `get_memory_section`
+* `get_capa_summary`
 * `resolve_symbol`
 * `get_xrefs`
 * `search_decomp`
@@ -454,7 +476,8 @@ No code execution, no uploading binaries to random SaaS if you point it at your 
 ```bash
 git clone https://github.com/Karib0u/kernagent.git
 cd kernagent
-cp .env.example .env
+mkdir -p ~/.config/kernagent
+cp config.env.example ~/.config/kernagent/config.env
 docker compose build
 docker compose run --rm kernagent --help
 ```
@@ -464,7 +487,8 @@ docker compose run --rm kernagent --help
 ```powershell
 git clone https://github.com/Karib0u/kernagent.git
 cd kernagent
-copy .env.example .env
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.config\kernagent" | Out-Null
+Copy-Item -Force config.env.example "$env:USERPROFILE\.config\kernagent\config.env"
 docker compose build
 docker compose run --rm kernagent --help
 ```
@@ -500,7 +524,7 @@ print(tools.search_imports_exports(name_pattern="WinInet"))
 kernagent/
   cli.py            # CLI: summary / ask / oneshot
   agent.py          # ReverseEngineeringAgent (tool loop)
-  config.py         # Settings (env + .env)
+  config.py         # Settings (env + global config file)
   llm_client.py     # OpenAI-compatible client
   prompts.py        # System prompts + tool schemas
   snapshot/

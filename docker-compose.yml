@@ -1,3 +1,6 @@
+x-config:
+  config_path: &kernagent_config ${KERNAGENT_CONFIG:-${HOME}/.config/kernagent/config.env}
+
 services:
   kernagent:
     build:
@@ -5,15 +8,17 @@ services:
       dockerfile: Dockerfile
     image: kernagent:latest
     container_name: kernagent
-    # Example: mount a directory with binaries for analysis
-    # volumes:
-    #   - ./samples:/data
-    #   - /path/to/your/binaries:/binaries
+    volumes:
+      - *kernagent_config:/config/config.env:ro
+      # Example: mount a directory with binaries for analysis
+      # - ./samples:/data
+      # - /path/to/your/binaries:/binaries
     env_file:
-      - .env
+      - *kernagent_config
     environment:
       # Override or add environment variables here if needed
       - PYTHONUNBUFFERED=1
+      - KERNAGENT_CONFIG=/config/config.env
     stdin_open: true
     tty: true
     # Default command shows help
@@ -32,10 +37,12 @@ services:
       # Mount source code for development
       - ./kernagent:/workspace/kernagent/kernagent
       - ./tests:/workspace/tests
+      - *kernagent_config:/config/config.env:ro
     env_file:
-      - .env
+      - *kernagent_config
     environment:
       - PYTHONUNBUFFERED=1
+      - KERNAGENT_CONFIG=/config/config.env
     stdin_open: true
     tty: true
     command: ["--help"]
