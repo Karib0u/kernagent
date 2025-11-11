@@ -95,6 +95,7 @@ jobs:
       - name: Create container for pytest run
         run: |
           docker create --name "$TEST_CONTAINER_NAME" \
+            --entrypoint "" \
             kernagent:test \
             python -m pytest /workspace/project/tests -v
 
