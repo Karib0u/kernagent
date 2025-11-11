@@ -13,14 +13,26 @@ ENV GHIDRA_URL=https://github.com/NationalSecurityAgency/ghidra/releases/downloa
 ENV GRADLE_VERSION=8.8
 
 # Install native build tooling required for Ghidra's decompiler
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    bison \
-    flex \
-    git \
-    unzip \
-    wget \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    retries=5; \
+    for attempt in $(seq 1 "${retries}"); do \
+        if apt-get update; then \
+            break; \
+        elif [ "${attempt}" -lt "${retries}" ]; then \
+            echo "apt-get update failed (attempt ${attempt}/${retries}); retrying..." >&2; \
+            sleep 5; \
+        else \
+            exit 1; \
+        fi; \
+    done; \
+    apt-get install -y \
+        build-essential \
+        bison \
+        flex \
+        git \
+        unzip \
+        wget; \
+    rm -rf /var/lib/apt/lists/*
 
 # Install a modern Gradle version (the apt one is too old for Ghidra)
 RUN wget -q "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -O /tmp/gradle.zip \
@@ -47,13 +59,25 @@ FROM eclipse-temurin:21-jdk-jammy
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install Python runtime and helpers
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    wget \
-    unzip \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    retries=5; \
+    for attempt in $(seq 1 "${retries}"); do \
+        if apt-get update; then \
+            break; \
+        elif [ "${attempt}" -lt "${retries}" ]; then \
+            echo "apt-get update failed (attempt ${attempt}/${retries}); retrying..." >&2; \
+            sleep 5; \
+        else \
+            exit 1; \
+        fi; \
+    done; \
+    apt-get install -y \
+        python3 \
+        python3-pip \
+        wget \
+        unzip \
+        curl; \
+    rm -rf /var/lib/apt/lists/*
 
 # Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
