@@ -150,7 +150,7 @@ Short version:
 
 ## 🖼️ Screenshots
 
-Below are examples running `kernagent` against a **WannaCry** sample, using a local LLM (LM Studio) with the **qwen3-4b-thinkink-2507** model — one of the best models for its size.
+Below are examples running `kernagent` against a **WannaCry** sample, using a local LLM (LM Studio) with the **qwen3-4b-thinking-2507** model — one of the best models for its size.
 
 ### Summary Command
 
