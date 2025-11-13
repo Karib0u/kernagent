@@ -1,0 +1,37 @@
+kernagent
+Copyright 2025 Karib0u
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+
+This distribution bundles third-party components. Their required notices follow.
+
+---
+
+**Ghidra**
+Copyright (c) National Security Agency
+(https://www.nsa.gov)
+
+This product includes software developed at the National Security Agency (NSA).
+Portions of this product were created by the U.S. Government and are not subject
+to U.S. copyright protections under 17 U.S.C.
+
+The Ghidra software is released under the Apache License, Version 2.0.
+See the LICENSE and LICENSE.txt files in Ghidra’s distribution for details.
+
+---
+
+**capa (FLARE / Mandiant)**
+Copyright (c) 2020 Mandiant, The FLARE Team
+https://github.com/mandiant/capa
+
+If you use this software, please cite it as:
+The FLARE Team. “capa, a tool to identify capabilities in programs and sandbox traces.” (2020)
+https://github.com/mandiant/capa
+
+Released under the Apache License, Version 2.0.
+
+---
+
+For license details, see the LICENSE file accompanying this project.

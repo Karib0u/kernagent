@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+YES=0
+QUIET=0
+NO_COLOR_FLAG=0
+VERBOSE=0
+TAG_PATTERN='*'
+DOCKER_BIN="${DOCKER_BIN:-docker}"
+WRAPPER_PATH=""
+
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+CONFIG_DIR="${CONFIG_HOME}/kernagent"
+
+C_RED=""; C_GRN=""; C_YLW=""; C_BLU=""; C_RST=""
+
+actions_done=0
+
+usage(){
+  cat <<'USAGE'
+kernagent-uninstall [--tag TAG|*] [--yes] [--quiet] [--no-color] [--verbose] [--docker-bin CMD]
+USAGE
+}
+
+configure_colors(){
+  if [[ -t 1 && "$NO_COLOR_FLAG" -eq 0 ]]; then
+    C_RED=$'\033[31m'
+    C_GRN=$'\033[32m'
+    C_YLW=$'\033[33m'
+    C_BLU=$'\033[34m'
+    C_RST=$'\033[0m'
+  fi
+}
+
+log(){ [[ "$QUIET" -eq 1 ]] && return 0; echo "${C_BLU}[*]${C_RST} $*"; }
+ok(){ [[ "$QUIET" -eq 1 ]] && return 0; echo "${C_GRN}[✓]${C_RST} $*"; }
+warn(){ echo "${C_YLW}[!]${C_RST} $*" >&2; }
+die(){ echo "${C_RED}[x]${C_RST} $*" >&2; exit 1; }
+run(){ if [[ "$VERBOSE" -eq 1 ]]; then echo "+ $*" >&2; fi; "$@"; }
+
+parse_args(){
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --tag)
+        [[ $# -lt 2 ]] && { usage >&2; exit 2; }
+        TAG_PATTERN="$2"
+        shift 2
+        ;;
+      --tag=*)
+        TAG_PATTERN="${1#*=}"
+        shift
+        ;;
+      --docker-bin)
+        [[ $# -lt 2 ]] && { usage >&2; exit 2; }
+        DOCKER_BIN="$2"
+        shift 2
+        ;;
+      --docker-bin=*)
+        DOCKER_BIN="${1#*=}"
+        shift
+        ;;
+      --yes)
+        YES=1
+        shift
+        ;;
+      --quiet)
+        QUIET=1
+        shift
+        ;;
+      --no-color)
+        NO_COLOR_FLAG=1
+        shift
+        ;;
+      --verbose)
+        VERBOSE=1
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        warn "Unknown option: $1"
+        usage >&2
+        exit 2
+        ;;
+    esac
+  done
+}
+
+confirm(){
+  local prompt="$1" default="$2" reply
+  if [[ $YES -eq 1 ]]; then
+    return 0
+  fi
+  if [[ ! -t 0 ]]; then
+    die "--yes required for non-interactive uninstallation"
+  fi
+  if [[ "$default" == "y" ]]; then
+    read -r -p "$prompt [Y/n] " reply
+    reply="${reply:-Y}"
+    [[ "$reply" =~ ^[Yy]$ ]]
+  else
+    read -r -p "$prompt [y/N] " reply
+    [[ "$reply" =~ ^[Yy]$ ]]
+  fi
+}
+
+remove_wrapper(){
+  if [[ -z "$WRAPPER_PATH" || ! -e "$WRAPPER_PATH" ]]; then
+    return
+  fi
+  if confirm "Remove wrapper at $WRAPPER_PATH?" "y"; then
+    if [[ -w "$WRAPPER_PATH" ]]; then
+      rm -f "$WRAPPER_PATH"
+    else
+      run sudo rm -f "$WRAPPER_PATH"
+    fi
+    ok "Removed wrapper"
+    actions_done=1
+  fi
+}
+
+list_images(){
+  if ! command -v "$DOCKER_BIN" >/dev/null 2>&1; then
+    warn "${DOCKER_BIN} not found; skipping image removal"
+    return 1
+  fi
+  "$DOCKER_BIN" images --format '{{.Repository}}:{{.Tag}}' ghcr.io/karib0u/kernagent 2>/dev/null || true
+}
+
+remove_images(){
+  local matches=()
+  while IFS= read -r ref; do
+    [[ -z "$ref" ]] && continue
+    case "$ref" in
+      ghcr.io/karib0u/kernagent:$TAG_PATTERN)
+        matches+=("$ref")
+        ;;
+    esac
+  done < <(list_images)
+  if [[ ${#matches[@]} -eq 0 ]]; then
+    return
+  fi
+  log "Found ${#matches[@]} image(s)"
+  if confirm "Remove Docker images matching ${TAG_PATTERN}?" "n"; then
+    run "$DOCKER_BIN" rmi "${matches[@]}"
+    ok "Removed Docker images"
+    actions_done=1
+  fi
+}
+
+remove_config(){
+  if [[ ! -d "$CONFIG_DIR" ]]; then
+    return
+  fi
+  if confirm "Remove configuration directory at $CONFIG_DIR?" "n"; then
+    rm -rf "$CONFIG_DIR"
+    ok "Removed configuration"
+    actions_done=1
+  fi
+}
+
+main(){
+  parse_args "$@"
+  configure_colors
+  WRAPPER_PATH="${KERNAGENT_WRAPPER:-$(command -v kernagent 2>/dev/null || true)}"
+  remove_wrapper
+  remove_images
+  remove_config
+  if [[ $actions_done -eq 0 ]]; then
+    log "Nothing to do."
+  fi
+}
+
+main "$@"

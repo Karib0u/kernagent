@@ -1,20 +1,17 @@
-x-config:
-  config_path: &kernagent_config ${KERNAGENT_CONFIG:-${HOME}/.config/kernagent/config.env}
-
 services:
   kernagent:
     build:
       context: .
       dockerfile: Dockerfile
-    image: kernagent:latest
+    image: ghcr.io/karib0u/kernagent:latest
     container_name: kernagent
     volumes:
-      - *kernagent_config:/config/config.env:ro
+      - ${KERNAGENT_CONFIG:-${HOME}/.config/kernagent/config.env}:/config/config.env:ro
       # Example: mount a directory with binaries for analysis
       # - ./samples:/data
       # - /path/to/your/binaries:/binaries
     env_file:
-      - *kernagent_config
+      - ${KERNAGENT_CONFIG:-${HOME}/.config/kernagent/config.env}
     environment:
       # Override or add environment variables here if needed
       - PYTHONUNBUFFERED=1
@@ -29,7 +26,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: kernagent:latest
+    image: ghcr.io/karib0u/kernagent:latest
     container_name: kernagent-dev
     volumes:
       # Example: mount a directory with binaries for analysis
@@ -37,9 +34,9 @@ services:
       # Mount source code for development
       - ./kernagent:/workspace/kernagent/kernagent
       - ./tests:/workspace/tests
-      - *kernagent_config:/config/config.env:ro
+      - ${KERNAGENT_CONFIG:-${HOME}/.config/kernagent/config.env}:/config/config.env:ro
     env_file:
-      - *kernagent_config
+      - ${KERNAGENT_CONFIG:-${HOME}/.config/kernagent/config.env}
     environment:
       - PYTHONUNBUFFERED=1
       - KERNAGENT_CONFIG=/config/config.env
@@ -49,7 +46,10 @@ services:
 
 # Example usage:
 #
-# Build the image:
+# Pull pre-built image (recommended for end users):
+#   docker compose pull
+#
+# Or build the image locally (for development):
 #   docker compose build
 #
 # Run analysis:

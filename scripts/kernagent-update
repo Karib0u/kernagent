@@ -1,0 +1,325 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+YES=0
+QUIET=0
+NO_COLOR_FLAG=0
+VERBOSE=0
+CHECK_ONLY=0
+INCLUDE_PRERELEASE=0
+REQUESTED_TAG=""
+DOCKER_BIN="${DOCKER_BIN:-docker}"
+WRAPPER_PATH=""
+LATEST_TAG=""
+PRE_RELEASE_HINT=""
+PULLED_IMAGE=""
+
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+CONFIG_DIR="${CONFIG_HOME}/kernagent"
+VERSION_FILE="${CONFIG_DIR}/.version"
+REPO_API="https://api.github.com/repos/Karib0u/kernagent/releases"
+
+C_RED=""; C_GRN=""; C_YLW=""; C_BLU=""; C_RST=""
+
+usage(){
+  cat <<'USAGE'
+kernagent-update [--check] [--include-prerelease] [--tag TAG] [--docker-bin CMD]
+                 [--yes] [--quiet] [--no-color] [--verbose]
+USAGE
+}
+
+configure_colors(){
+  if [[ -t 1 && "$NO_COLOR_FLAG" -eq 0 ]]; then
+    C_RED=$'\033[31m'
+    C_GRN=$'\033[32m'
+    C_YLW=$'\033[33m'
+    C_BLU=$'\033[34m'
+    C_RST=$'\033[0m'
+  fi
+}
+
+log(){ [[ "$QUIET" -eq 1 ]] && return 0; echo "${C_BLU}[*]${C_RST} $*"; }
+ok(){ [[ "$QUIET" -eq 1 ]] && return 0; echo "${C_GRN}[✓]${C_RST} $*"; }
+warn(){ echo "${C_YLW}[!]${C_RST} $*" >&2; }
+die(){ echo "${C_RED}[x]${C_RST} $*" >&2; exit 1; }
+run(){ if [[ "$VERBOSE" -eq 1 ]]; then echo "+ $*" >&2; fi; "$@"; }
+need_cmd(){ command -v "$1" >/dev/null 2>&1 || die "Required command '$1' not found"; }
+
+parse_args(){
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --check)
+        CHECK_ONLY=1
+        shift
+        ;;
+      --include-prerelease)
+        INCLUDE_PRERELEASE=1
+        shift
+        ;;
+      --tag)
+        [[ $# -lt 2 ]] && { usage >&2; exit 2; }
+        REQUESTED_TAG="$2"
+        shift 2
+        ;;
+      --tag=*)
+        REQUESTED_TAG="${1#*=}"
+        shift
+        ;;
+      --docker-bin)
+        [[ $# -lt 2 ]] && { usage >&2; exit 2; }
+        DOCKER_BIN="$2"
+        shift 2
+        ;;
+      --docker-bin=*)
+        DOCKER_BIN="${1#*=}"
+        shift
+        ;;
+      --yes)
+        YES=1
+        shift
+        ;;
+      --quiet)
+        QUIET=1
+        shift
+        ;;
+      --no-color)
+        NO_COLOR_FLAG=1
+        shift
+        ;;
+      --verbose)
+        VERBOSE=1
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        warn "Unknown option: $1"
+        usage >&2
+        exit 2
+        ;;
+    esac
+  done
+}
+
+installed_tag(){
+  if [[ -s "$VERSION_FILE" ]]; then
+    tr -d '\n' < "$VERSION_FILE"
+    return 0
+  fi
+  if [[ -n "$WRAPPER_PATH" && -f "$WRAPPER_PATH" ]]; then
+    local line
+    line="$(grep -E '^IMAGE="' "$WRAPPER_PATH" | head -n1 || true)"
+    if [[ -n "$line" ]]; then
+      printf '%s\n' "${line##*:}" | tr -d '"'
+      return 0
+    fi
+  fi
+  die "Unable to determine installed tag"
+}
+
+discover_latest(){
+  need_cmd curl
+  local tmp output status tag_line tag
+  tmp="$(mktemp)"
+  if ! curl -fsSL "$REPO_API" -o "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    if ! output="$(python3 - "$tmp" "$INCLUDE_PRERELEASE" <<'PY'
+import json, sys
+path = sys.argv[1]
+include_pre = bool(int(sys.argv[2]))
+with open(path, 'rb') as fh:
+    data = json.load(fh)
+
+def ts(rel):
+    for key in ("published_at", "created_at"):
+        val = rel.get(key)
+        if val:
+            return val
+    return ""
+clean = [r for r in data if not r.get('draft')]
+clean.sort(key=lambda r: (ts(r), r.get('tag_name') or ''), reverse=True)
+pre_hint = next((r.get('tag_name') for r in clean if r.get('prerelease')), '')
+if include_pre:
+    if not clean:
+        sys.exit(1)
+    print(clean[0].get('tag_name', ''))
+    print(pre_hint or '')
+    sys.exit(0)
+for rel in clean:
+    if rel.get('prerelease'):
+        continue
+    print(rel.get('tag_name', ''))
+    print(pre_hint or '')
+    sys.exit(0)
+sys.exit(1)
+PY
+)"; then
+      rm -f "$tmp"
+      return 1
+    fi
+    LATEST_TAG="$(printf '%s\n' "$output" | sed -n '1p')"
+    PRE_RELEASE_HINT="$(printf '%s\n' "$output" | sed -n '2p')"
+  else
+    tag_line="$(grep -m1 '"tag_name"' "$tmp" || true)"
+    if [[ -z "$tag_line" ]]; then
+      rm -f "$tmp"
+      return 1
+    fi
+    tag="$(echo "$tag_line" | sed -E 's/.*"tag_name"\s*:\s*"([^"]+)".*/\1/')"
+    LATEST_TAG="$tag"
+    PRE_RELEASE_HINT=""
+  fi
+  rm -f "$tmp"
+  [[ -n "$LATEST_TAG" ]]
+}
+
+maybe_prompt(){
+  local from="$1" to="$2"
+  if [[ $CHECK_ONLY -eq 1 ]]; then
+    return 0
+  fi
+  if [[ -t 0 && $YES -eq 0 ]]; then
+    local answer
+    read -r -p "Update available: ${from} -> ${to}. Apply now? [Y/n] " answer
+    answer="${answer:-Y}"
+    if [[ ! "$answer" =~ ^[Yy]$ ]]; then
+      return 1
+    fi
+  fi
+  return 0
+}
+
+pull_image(){
+  need_cmd "$DOCKER_BIN"
+  local image="$1" repo tag first second pulled=""
+  repo="${image%:*}"
+  tag="${image##*:}"
+  # Prefer non-v tag on registries that commonly omit the 'v' (e.g., GHCR)
+  if [[ "$tag" == v* ]]; then
+    first="${repo}:${tag#v}"
+    second="${repo}:${tag}"
+  else
+    first="${repo}:${tag}"
+    second="${repo}:v${tag}"
+  fi
+  log "Pulling ${first}"
+  if docker_pull_quiet "$first"; then
+    pulled="$first"
+  else
+    warn "Image ${first} not found; retrying ${second}"
+    if docker_pull "$second"; then
+      pulled="$second"
+    fi
+  fi
+  if [[ -z "$pulled" ]]; then
+    die "Failed to pull ${image}"
+  fi
+  PULLED_IMAGE="$pulled"
+}
+
+docker_pull(){
+  if [[ "$VERBOSE" -eq 1 ]]; then
+    echo "+ $DOCKER_BIN pull $1" >&2
+  fi
+  "$DOCKER_BIN" pull "$1"
+}
+
+docker_pull_quiet(){
+  if [[ "$VERBOSE" -eq 1 ]]; then
+    echo "+ $DOCKER_BIN pull $1 (quiet)" >&2
+  fi
+  "$DOCKER_BIN" pull "$1" >/dev/null 2>&1
+}
+
+patch_wrapper(){
+  local new_image="$1"
+  [[ -n "$WRAPPER_PATH" && -f "$WRAPPER_PATH" ]] || die "kernagent wrapper not found"
+  local tmp dest_dir
+  tmp="$(mktemp)"
+  awk -v image="$new_image" 'BEGIN{done=0}{if(!done && $0 ~ /^IMAGE="/){print "IMAGE=\""image"\""; done=1; next} print}' "$WRAPPER_PATH" > "$tmp"
+  chmod --reference "$WRAPPER_PATH" "$tmp" 2>/dev/null || chmod 755 "$tmp"
+  dest_dir="$(dirname "$WRAPPER_PATH")"
+  if [[ -w "$WRAPPER_PATH" && -w "$dest_dir" ]]; then
+    mv "$tmp" "$WRAPPER_PATH"
+  else
+    run sudo mv "$tmp" "$WRAPPER_PATH"
+  fi
+}
+
+record_version(){
+  mkdir -p "$CONFIG_DIR"
+  if ! printf '%s\n' "$1" > "$VERSION_FILE" 2>/dev/null; then
+    warn "Could not update $VERSION_FILE"
+  fi
+}
+
+main(){
+  parse_args "$@"
+  configure_colors
+  WRAPPER_PATH="${KERNAGENT_WRAPPER:-$(command -v kernagent 2>/dev/null || true)}"
+  local current_tag target_tag pre_hint=""
+  current_tag="$(installed_tag)"
+  if [[ -n "$REQUESTED_TAG" ]]; then
+    target_tag="$REQUESTED_TAG"
+  else
+    if ! discover_latest; then
+      die "Couldn't discover latest. Use: kernagent-update --tag vX.Y.Z"
+    fi
+    target_tag="$LATEST_TAG"
+    pre_hint="$PRE_RELEASE_HINT"
+    if [[ -z "$target_tag" ]]; then
+      die "Couldn't discover latest. Use: kernagent-update --tag vX.Y.Z"
+    fi
+  fi
+  # Treat 'latest' (or 'stable') as a moving alias that is always up-to-date
+  case "$current_tag" in
+    latest|stable)
+      if [[ $CHECK_ONLY -eq 1 ]]; then
+        log "kernagent is up-to-date (${current_tag} -> ${target_tag})"
+        exit 0
+      fi
+      ok "Already on ${current_tag} (${target_tag})"
+      exit 0
+      ;;
+  esac
+  if [[ "$target_tag" == "$current_tag" ]]; then
+    if [[ $INCLUDE_PRERELEASE -eq 0 && -n "$pre_hint" ]]; then
+      warn "Pre-release available (${pre_hint}). Use --include-prerelease to include it."
+    fi
+    if [[ $CHECK_ONLY -eq 1 ]]; then
+      log "kernagent is up-to-date (${current_tag})"
+      exit 0
+    fi
+    ok "Already on ${current_tag}"
+    exit 0
+  fi
+  if [[ $CHECK_ONLY -eq 1 ]]; then
+    if [[ $INCLUDE_PRERELEASE -eq 0 && -n "$pre_hint" ]]; then
+      warn "Pre-release available (${pre_hint}). Use --include-prerelease to include it."
+    fi
+    log "Update available: ${current_tag} -> ${target_tag}"
+    exit 10
+  fi
+  if [[ $INCLUDE_PRERELEASE -eq 0 && -n "$pre_hint" ]]; then
+    warn "Pre-release available (${pre_hint}). Use --include-prerelease to include it."
+  fi
+  if ! maybe_prompt "$current_tag" "$target_tag"; then
+    log "Update skipped"
+    exit 0
+  fi
+  local image="ghcr.io/karib0u/kernagent:${target_tag}"
+  pull_image "$image"
+  image="${PULLED_IMAGE:-$image}"
+  patch_wrapper "$image"
+  # Record the tag we actually installed (normalized)
+  record_version "${image##*:}"
+  ok "Switched to ${target_tag}"
+}
+
+main "$@"

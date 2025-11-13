@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+IMAGE="@@IMAGE_FQN@@"
+DOCKER_BIN="${DOCKER_BIN:-${KERNAGENT_DOCKER_BIN:-docker}}"
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+CONFIG_DIR="${CONFIG_HOME}/kernagent"
+VERSION_FILE="${CONFIG_DIR}/.version"
+CONFIG_FILE_DEFAULT="${KERNAGENT_CONFIG:-${CONFIG_DIR}/config.env}"
+
+QUIET=${KERNAGENT_WRAPPER_QUIET:-0}
+NO_COLOR_ENV=${NO_COLOR:+1}
+VERBOSE=${KERNAGENT_WRAPPER_VERBOSE:-0}
+C_RED=""; C_GRN=""; C_YLW=""; C_BLU=""; C_RST=""
+
+configure_colors(){
+  if [[ -t 1 && "${NO_COLOR_ENV:-0}" -eq 0 ]]; then
+    C_RED=$'\033[31m'
+    C_GRN=$'\033[32m'
+    C_YLW=$'\033[33m'
+    C_BLU=$'\033[34m'
+    C_RST=$'\033[0m'
+  fi
+}
+
+log(){ [[ "$QUIET" -eq 1 ]] && return 0; echo "${C_BLU}[*]${C_RST} $*"; }
+ok(){ [[ "$QUIET" -eq 1 ]] && return 0; echo "${C_GRN}[✓]${C_RST} $*"; }
+warn(){ echo "${C_YLW}[!]${C_RST} $*" >&2; }
+die(){ echo "${C_RED}[x]${C_RST} $*" >&2; exit 1; }
+run(){ if [[ "$VERBOSE" -eq 1 ]]; then echo "+ $*" >&2; fi; "$@"; }
+
+installed_tag(){
+  if [[ -s "$VERSION_FILE" ]]; then
+    tr -d '\n' < "$VERSION_FILE"
+    return 0
+  fi
+  printf '%s\n' "${IMAGE##*:}"
+}
+
+container_version(){
+  command -v "$DOCKER_BIN" >/dev/null 2>&1 || return 1
+  local out
+  if out="$("$DOCKER_BIN" run --rm "$IMAGE" --version 2>/dev/null | head -n 1)" && [[ -n "$out" ]]; then
+    printf '%s\n' "$out"
+    return 0
+  fi
+  return 1
+}
+
+print_version(){
+  configure_colors
+  local tag
+  tag="$(installed_tag)"
+  log "Installed tag: ${tag}"
+  if cv="$(container_version)"; then
+    log "Container: ${cv}"
+  else
+    warn "Could not query container version"
+  fi
+}
+
+run_config(){
+  if ! command -v kernagent-config >/dev/null 2>&1; then
+    die "kernagent-config not found on PATH"
+  fi
+  shift
+  exec kernagent-config "$@"
+}
+
+run_update(){
+  if ! command -v kernagent-update >/dev/null 2>&1; then
+    die "kernagent-update not found on PATH"
+  fi
+  shift
+  exec kernagent-update "$@"
+}
+
+run_uninstall(){
+  if ! command -v kernagent-uninstall >/dev/null 2>&1; then
+    die "kernagent-uninstall not found on PATH"
+  fi
+  shift
+  exec kernagent-uninstall "$@"
+}
+
+forward_help(){
+  shift
+  run_container --help "$@"
+}
+
+run_container(){
+  command -v "$DOCKER_BIN" >/dev/null 2>&1 || die "${DOCKER_BIN} not found"
+  local docker_args=(run --rm)
+  if [[ -t 0 && -t 1 ]]; then
+    docker_args+=(-it)
+  else
+    docker_args+=(-i)
+  fi
+  local -a args=()
+  if [[ $# -gt 0 ]]; then
+    args=( "$@" )
+  fi
+  local binary_idx=-1
+  local candidate=""
+  local idx=""
+  local value=""
+  if ((${#args[@]})); then
+    for idx in "${!args[@]}"; do
+      value="${args[$idx]}"
+      [[ -z "$value" ]] && continue
+      if [[ "$value" == -* ]]; then
+        continue
+      fi
+      # Treat the first existing file argument as the candidate.
+      # No extension heuristics: supports extensionless malware samples.
+      if [[ -f "$value" ]]; then
+        candidate="$value"
+        binary_idx=$idx
+        break
+      fi
+    done
+  fi
+  local mount_dir=""
+  if [[ -n "$candidate" ]]; then
+    local abs_dir=""
+    if abs_dir="$(cd "$(dirname "$candidate")" 2>/dev/null && pwd -P)"; then
+      mount_dir="$abs_dir"
+      local base_name
+      base_name="$(basename "$candidate")"
+      args[$binary_idx]="/data/${base_name}"
+    fi
+  fi
+  if [[ -n "$mount_dir" ]]; then
+    docker_args+=( -v "${mount_dir}:/data" )
+  else
+    docker_args+=( -v "$(pwd):/data" )
+  fi
+  if [[ -f "$CONFIG_FILE_DEFAULT" ]]; then
+    docker_args+=( -v "$CONFIG_FILE_DEFAULT:/config/config.env:ro" )
+    docker_args+=( -e KERNAGENT_CONFIG=/config/config.env )
+  fi
+  for var in OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL; do
+    if [[ -n "${!var:-}" ]]; then
+      docker_args+=( -e "${var}=${!var}" )
+    fi
+  done
+  docker_args+=( "$IMAGE" )
+  # Append CLI args preserving spaces/special characters
+  if ((${#args[@]})); then
+    docker_args+=("${args[@]}")
+  fi
+  "$DOCKER_BIN" "${docker_args[@]}"
+}
+
+main(){
+  configure_colors
+  case "${1:-}" in
+    --version)
+      print_version
+      exit 0
+      ;;
+    --help|help)
+      forward_help "$@"
+      exit 0
+      ;;
+    config)
+      run_config "$@"
+      ;;
+    update)
+      run_update "$@"
+      ;;
+    uninstall)
+      run_uninstall "$@"
+      ;;
+  esac
+  run_container "$@"
+}
+
+main "$@"
