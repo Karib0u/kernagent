@@ -60,14 +60,6 @@ print_version(){
   fi
 }
 
-run_config(){
-  if ! command -v kernagent-config >/dev/null 2>&1; then
-    die "kernagent-config not found on PATH"
-  fi
-  shift
-  exec kernagent-config "$@"
-}
-
 run_update(){
   if ! command -v kernagent-update >/dev/null 2>&1; then
     die "kernagent-update not found on PATH"
@@ -136,10 +128,14 @@ run_container(){
   else
     docker_args+=( -v "$(pwd):/data" )
   fi
-  if [[ -f "$CONFIG_FILE_DEFAULT" ]]; then
-    docker_args+=( -v "$CONFIG_FILE_DEFAULT:/config/config.env:ro" )
-    docker_args+=( -e KERNAGENT_CONFIG=/config/config.env )
+  # Ensure config file exists (prevents Docker from creating a directory mount)
+  if [[ ! -f "$CONFIG_FILE_DEFAULT" ]]; then
+    mkdir -p "$(dirname "$CONFIG_FILE_DEFAULT")"
+    touch "$CONFIG_FILE_DEFAULT"
   fi
+  # Mount config file read-write so 'init' command can write to it
+  docker_args+=( -v "$CONFIG_FILE_DEFAULT:/config/config.env" )
+  docker_args+=( -e KERNAGENT_CONFIG=/config/config.env )
   for var in OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL; do
     if [[ -n "${!var:-}" ]]; then
       docker_args+=( -e "${var}=${!var}" )
@@ -163,9 +159,6 @@ main(){
     --help|help)
       forward_help "$@"
       exit 0
-      ;;
-    config)
-      run_config "$@"
       ;;
     update)
       run_update "$@"

@@ -25,7 +25,7 @@ from kernagent.oneshot.pruner import (
 @pytest.fixture
 def fixture_archive():
     """Path to test fixture archive."""
-    return Path(__file__).parent / "fixtures" / "bifrose_archive"
+    return Path(__file__).parent / "fixtures" / "bifrose.snapshot"
 
 
 class TestStringClassification:

@@ -84,6 +84,48 @@ Constrain yourself to what the tools reveal. Do not invent behavior without evid
 Addresses are hex WITHOUT `0x` prefix.
 """
 
+ANALYZE_SYSTEM_PROMPT = """
+You are an elite malware analyst. You are given a deterministic JSON summary of a binary's static artifacts (strings, imports, functions, sections).
+
+Your goal is to provide a definitive threat assessment.
+
+### INSTRUCTIONS
+1. **Analyze** the provided JSON data.
+2. **Determine** the binary's intent based on the evidence (capabilities, API calls, strings).
+3. **Output** a report in Markdown format with the exact sections below.
+
+### REPORT FORMAT
+
+## Executive Summary
+(1-2 sentences describing the binary's primary function and intent.)
+
+## Risk Assessment
+**Level:** [HIGH / MEDIUM / LOW / BENIGN]
+**Justification:** (One sentence explaining the risk level.)
+
+## Classification
+**Verdict:** [MALICIOUS / GRAYWARE / BENIGN]
+**Family:** (If identifiable, e.g., "Ransomware", "Trojan", or "Unknown")
+
+## Key Behaviors
+(3-5 bullet points. Each point MUST cite specific evidence like function names, APIs, or strings found in the JSON.)
+* **Behavior 1:** ...
+* **Behavior 2:** ...
+
+## Technical Highlights
+(Group important technical findings)
+* **Networking:** (URLs, IPs, User-Agents)
+* **Capabilities:** (Persistence, Evasion, Crypto, etc.)
+* **Suspicious Indicators:** (Packers, anti-debug, RWX sections)
+
+## Suggested Investigation
+(3 specific questions the user should ask in the 'chat' mode to dig deeper)
+1. ...
+2. ...
+3. ...
+"""
+
+# Legacy prompt - kept for reference, not used in new CLI
 ONESHOT_SYSTEM_PROMPT = """
 You are an expert malware analyst.
 
@@ -647,9 +689,10 @@ TOOLS = [
 ]
 
 # ============================================================================
-# AUTO-SUMMARY PROMPT - Used when --summary flag is provided
+# LEGACY PROMPTS - Deprecated, kept for backwards compatibility
 # ============================================================================
 
+# DEPRECATED: Use ANALYZE_SYSTEM_PROMPT instead
 AUTO_SUMMARY_PROMPT = """Analyze this binary and provide an executive summary with:
 
 1. **Purpose**: What does this binary do? (1-2 sentences)
@@ -662,6 +705,7 @@ AUTO_SUMMARY_PROMPT = """Analyze this binary and provide an executive summary wi
 Keep it concise, actionable, and evidence-based. Cite specific addresses and function names.
 """
 
+# DEPRECATED: Use ANALYZE_SYSTEM_PROMPT instead
 AUTO_SUMMARY_ONESHOT_SYSTEM_PROMPT = """
 You are an expert reverse-engineering assistant.
 

@@ -219,7 +219,6 @@ main(){
   image="${PULLED_IMAGE:-$image}"
   local wrapper_tmp
   wrapper_tmp="$(template_wrapper "$image")"
-  install_host_script "kernagent-config" "${INSTALL_DIR%/}/kernagent-config"
   install_host_script "kernagent-update" "${INSTALL_DIR%/}/kernagent-update"
   install_host_script "kernagent-uninstall" "${INSTALL_DIR%/}/kernagent-uninstall"
   move_file "$wrapper_tmp" "${INSTALL_DIR%/}/kernagent"
@@ -228,7 +227,7 @@ main(){
   if [[ ":$PATH:" != *":${INSTALL_DIR%/}:"* ]]; then
     warn "${INSTALL_DIR%/} not on PATH. Add it to use kernagent."
   fi
-  log "Next: run kernagent-config"
+  log "Next: run 'kernagent init' to configure your LLM provider"
 }
 
 main "$@"

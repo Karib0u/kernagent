@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Iterator
+
 try:
     from openai import OpenAI
 except ImportError:  # pragma: no cover - handled lazily
@@ -51,3 +53,25 @@ class LLMClient:
             )
 
         return response
+
+    def chat_stream(self, verbose: bool = False, **kwargs) -> Iterator[str]:
+        """Stream chat completions token by token.
+
+        Args:
+            verbose: If True, log API call details.
+            **kwargs: Arguments passed to the OpenAI chat completions API.
+
+        Yields:
+            Content strings as they arrive from the API.
+        """
+        kwargs.setdefault("model", self.settings.model)
+        kwargs["stream"] = True
+
+        if verbose:
+            logger.info("Streaming LLM API with model: %s", kwargs["model"])
+
+        stream = self.client.chat.completions.create(**kwargs)
+
+        for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content

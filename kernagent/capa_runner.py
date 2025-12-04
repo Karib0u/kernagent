@@ -271,7 +271,7 @@ def _analyze_with_capa(binary_path: Path, rules_path: Optional[Path]):
     return doc, rules
 
 
-def build_capa_summary(binary_path: Path, output_dir: Path, rules_path: Path | None = None) -> Optional[Path]:
+def build_capa_summary(binary_path: Path, output_dir: Path, rules_path: Path | None = None, verbose: bool = False) -> Optional[Path]:
     """
     Execute flare-capa on `binary_path` and write a filtered JSON summary.
 
@@ -280,7 +280,8 @@ def build_capa_summary(binary_path: Path, output_dir: Path, rules_path: Path | N
     """
 
     if _env_flag("CAPA_DISABLE"):
-        logger.info("CAPA_DISABLE is set; skipping capa analysis.")
+        if verbose:
+            logger.info("CAPA_DISABLE is set; skipping capa analysis.")
         return None
 
     binary_path = Path(binary_path)
@@ -303,7 +304,8 @@ def build_capa_summary(binary_path: Path, output_dir: Path, rules_path: Path | N
             summaries.append(summary)
 
     if not summaries:
-        logger.info("capa produced no high-signal matches for %s", binary_path)
+        if verbose:
+            logger.info("capa produced no high-signal matches for %s", binary_path)
         return None
 
     summaries = sorted(
@@ -356,12 +358,13 @@ def build_capa_summary(binary_path: Path, output_dir: Path, rules_path: Path | N
     with output_path.open("w", encoding="utf-8") as fh:
         json.dump(payload, fh, indent=2)
 
-    logger.info(
-        "capa summary written for %s (%d rules, %d attack mappings)",
-        binary_path.name,
-        counts["rules"],
-        counts["attack_mappings"],
-    )
+    if verbose:
+        logger.info(
+            "capa summary written for %s (%d rules, %d attack mappings)",
+            binary_path.name,
+            counts["rules"],
+            counts["attack_mappings"],
+        )
     return output_path
 
 

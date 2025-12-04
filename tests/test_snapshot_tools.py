@@ -3,7 +3,7 @@ from pathlib import Path
 from kernagent.snapshot import SnapshotTools
 
 
-SNAPSHOT_ROOT = Path(__file__).parent / "fixtures" / "bifrose_archive"
+SNAPSHOT_ROOT = Path(__file__).parent / "fixtures" / "bifrose.snapshot"
 
 
 def test_read_json_loads_meta():

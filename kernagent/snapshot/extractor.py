@@ -5,14 +5,25 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
-import zipfile
 from pathlib import Path
 from typing import Any, Dict, List
+from contextlib import contextmanager
+
+from rich.console import Console
+from rich.progress import (
+    Progress,
+    BarColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+    TaskProgressColumn,
+)
 
 from ..capa_runner import build_capa_summary
 from ..log import get_logger
 
 logger = get_logger(__name__)
+console = Console()
 
 
 class SnapshotError(RuntimeError):
@@ -54,7 +65,7 @@ class BinaryArchiveExtractor:
 
         self.binary_path = binary_path.resolve()
         self.verbose = verbose
-        self.output_dir = self.binary_path.parent / f"{self.binary_path.stem}_archive"
+        self.output_dir = self.binary_path.parent / f"{self.binary_path.stem}.snapshot"
         self.decompiler = None
 
     def log(self, message: str):
@@ -63,6 +74,20 @@ class BinaryArchiveExtractor:
             logger.info(message)
         else:
             logger.debug(message)
+
+    @contextmanager
+    def status(self, message: str):
+        """
+        Show a transient status spinner when not in verbose mode.
+        In verbose mode we just log once and proceed.
+        """
+        status = None
+        if self.verbose:
+            self.log(message)
+            yield status
+        else:
+            with console.status(f"[cyan]{message}[/]") as status:
+                yield status
 
     def sanitize_filename(self, func_name: str, address: str, max_length: int = 200) -> str:
         """
@@ -789,7 +814,10 @@ class BinaryArchiveExtractor:
 
     def extract_all(self) -> Path:
         """Main extraction routine."""
-        logger.info("Starting snapshot extraction for %s", self.binary_path)
+        if self.verbose:
+            logger.info("Starting snapshot extraction for %s", self.binary_path)
+        else:
+            console.print(f"[bold cyan]Starting snapshot extraction:[/] {self.binary_path.name}")
 
         self.output_dir.mkdir(exist_ok=True)
         decomp_dir = self.output_dir / "decomp"
@@ -802,92 +830,159 @@ class BinaryArchiveExtractor:
 
         try:
             with pyghidra.open_program(self.binary_path, analyze=True) as flat_api:
-                program = flat_api.getCurrentProgram()
-                monitor = ConsoleTaskMonitor()
-
-                self.log(f"Program loaded: {program.getName()}")
-                self.log("Waiting for analysis to complete...")
+                # Phase 1: Load program
+                with self.status("Loading program and analyzing..."):
+                    program = flat_api.getCurrentProgram()
+                    monitor = ConsoleTaskMonitor()
+                    self.log(f"Program loaded: {program.getName()}")
+                if not self.verbose:
+                    console.print("[green]✓[/] Program analyzed and loaded")
 
                 self.decompiler = DecompInterface()
                 self.decompiler.openProgram(program)
 
-                metadata = self.extract_metadata(program)
-                with open(meta_path, "w", encoding="utf-8") as f:
-                    json.dump(metadata, f, indent=2)
-
+                # Phase 2: Extract metadata
+                with self.status("Extracting metadata..."):
+                    metadata = self.extract_metadata(program)
+                    with open(meta_path, "w", encoding="utf-8") as f:
+                        json.dump(metadata, f, indent=2)
+                if not self.verbose:
+                    console.print(f"[green]✓[/] Binary metadata extracted ([dim]{metadata.get('executable_format', 'unknown')}[/dim])")
                 self.log(f"Metadata extracted (SHA256: {metadata['sha256']})")
 
-                sections = self.extract_memory_sections(program)
-                with open(self.output_dir / "sections.json", "w", encoding="utf-8") as f:
-                    json.dump(sections, f, indent=2)
+                # Phase 3: Extract sections
+                with self.status("Extracting memory sections..."):
+                    sections = self.extract_memory_sections(program)
+                    with open(self.output_dir / "sections.json", "w", encoding="utf-8") as f:
+                        json.dump(sections, f, indent=2)
+                if not self.verbose:
+                    console.print(f"[green]✓[/] Found [bold]{len(sections)}[/bold] memory sections")
 
-                imports_exports = self.extract_imports_exports(program)
-                with open(
-                    self.output_dir / "imports_exports.json", "w", encoding="utf-8"
-                ) as f:
-                    json.dump(imports_exports, f, indent=2)
+                # Phase 4: Extract imports/exports
+                with self.status("Extracting imports/exports..."):
+                    imports_exports = self.extract_imports_exports(program)
+                    with open(
+                        self.output_dir / "imports_exports.json", "w", encoding="utf-8"
+                    ) as f:
+                        json.dump(imports_exports, f, indent=2)
+                if not self.verbose:
+                    imp_count = len(imports_exports.get("imports", []))
+                    exp_count = len(imports_exports.get("exports", []))
+                    console.print(f"[green]✓[/] Found [bold]{imp_count}[/bold] imports and [bold]{exp_count}[/bold] exports")
 
-                equates = self.extract_equates(program)
-                with open(self.output_dir / "equates.json", "w", encoding="utf-8") as f:
-                    json.dump(equates, f, indent=2)
+                # Phase 5: Extract equates
+                with self.status("Extracting equates..."):
+                    equates = self.extract_equates(program)
+                    with open(self.output_dir / "equates.json", "w", encoding="utf-8") as f:
+                        json.dump(equates, f, indent=2)
+                if not self.verbose:
+                    console.print(f"[green]✓[/] Extracted [bold]{len(equates)}[/bold] equates")
 
+                # Phase 6: Process functions (the slow part)
                 func_manager = program.getFunctionManager()
                 functions = list(func_manager.getFunctions(True))
 
                 functions_data = []
                 decomp_count = 0
 
-                for i, func in enumerate(functions, 1):
-                    if self.verbose and i % 50 == 0:
-                        self.log(f"Processing function {i}/{len(functions)}...")
+                if not self.verbose:
+                    progress = Progress(
+                        TextColumn("[progress.description]{task.description}"),
+                        BarColumn(),
+                        TaskProgressColumn(),
+                        TimeElapsedColumn(),
+                        TimeRemainingColumn(),
+                        transient=True,
+                        refresh_per_second=4,
+                    )
+                    with progress:
+                        task_id = progress.add_task(
+                            f"[cyan]Decompiling {len(functions)} functions...",
+                            total=len(functions),
+                        )
+                        for func in functions:
+                            func_data = self.extract_function_data(func, program, monitor)
 
-                    func_data = self.extract_function_data(func, program, monitor)
+                            if func_data.get("decompiled_code"):
+                                decomp_path = decomp_dir / Path(func_data["decomp_path"]).name
+                                with open(decomp_path, "w", encoding="utf-8") as f:
+                                    f.write(func_data["decompiled_code"])
+                                decomp_count += 1
+                                del func_data["decompiled_code"]
 
-                    if func_data.get("decompiled_code"):
-                        decomp_path = decomp_dir / Path(func_data["decomp_path"]).name
-                        with open(decomp_path, "w", encoding="utf-8") as f:
-                            f.write(func_data["decompiled_code"])
-                        decomp_count += 1
-                        del func_data["decompiled_code"]
+                            functions_data.append(func_data)
+                            progress.update(task_id, advance=1)
+                else:
+                    for i, func in enumerate(functions, 1):
+                        func_data = self.extract_function_data(func, program, monitor)
 
-                    functions_data.append(func_data)
+                        if func_data.get("decompiled_code"):
+                            decomp_path = decomp_dir / Path(func_data["decomp_path"]).name
+                            with open(decomp_path, "w", encoding="utf-8") as f:
+                                f.write(func_data["decompiled_code"])
+                            decomp_count += 1
+                            del func_data["decompiled_code"]
 
-                call_graph = self.extract_call_graph(program)
-                with open(
-                    self.output_dir / "callgraph.jsonl", "w", encoding="utf-8"
-                ) as f:
-                    for edge in call_graph:
-                        f.write(json.dumps(edge) + "\n")
+                        functions_data.append(func_data)
 
-                index = self.create_index(functions_data)
-                with open(self.output_dir / "index.json", "w", encoding="utf-8") as f:
-                    json.dump(index, f, indent=2)
+                        if i % 50 == 0:
+                            self.log(f"Processed {i}/{len(functions)} functions")
 
-                with open(
-                    self.output_dir / "functions.jsonl", "w", encoding="utf-8"
-                ) as f:
-                    for func_data in functions_data:
-                        f.write(json.dumps(func_data) + "\n")
+                if not self.verbose:
+                    console.print(f"[green]✓[/] Decompiled [bold]{decomp_count}[/bold] of [bold]{len(functions)}[/bold] functions")
 
-                strings_data = self.extract_strings(program)
-                with open(
-                    self.output_dir / "strings.jsonl", "w", encoding="utf-8"
-                ) as f:
-                    for string_data in strings_data:
-                        f.write(json.dumps(string_data) + "\n")
+                # Phase 7: Extract call graph
+                with self.status("Extracting call graph..."):
+                    call_graph = self.extract_call_graph(program)
+                    with open(
+                        self.output_dir / "callgraph.jsonl", "w", encoding="utf-8"
+                    ) as f:
+                        for edge in call_graph:
+                            f.write(json.dumps(edge) + "\n")
+                if not self.verbose:
+                    console.print(f"[green]✓[/] Extracted [bold]{len(call_graph)}[/bold] call graph edges")
 
-                data_sections = self.extract_data_sections(program)
-                with open(self.output_dir / "data.jsonl", "w", encoding="utf-8") as f:
+                # Phase 8: Create index
+                with self.status("Creating index..."):
+                    index = self.create_index(functions_data)
+                    with open(self.output_dir / "index.json", "w", encoding="utf-8") as f:
+                        json.dump(index, f, indent=2)
+
+                    with open(
+                        self.output_dir / "functions.jsonl", "w", encoding="utf-8"
+                    ) as f:
+                        for func_data in functions_data:
+                            f.write(json.dumps(func_data) + "\n")
+                if not self.verbose:
+                    console.print(f"[green]✓[/] Function index created")
+
+                # Phase 9: Extract strings
+                with self.status("Extracting strings..."):
+                    strings_data = self.extract_strings(program)
+                    with open(
+                        self.output_dir / "strings.jsonl", "w", encoding="utf-8"
+                    ) as f:
+                        for string_data in strings_data:
+                            f.write(json.dumps(string_data) + "\n")
+                if not self.verbose:
+                    console.print(f"[green]✓[/] Found [bold]{len(strings_data)}[/bold] strings")
+
+                # Phase 10: Extract data sections
+                with self.status("Extracting data sections..."):
+                    data_sections = self.extract_data_sections(program)
+                    with open(self.output_dir / "data.jsonl", "w", encoding="utf-8") as f:
+                        for data_item in data_sections:
+                            f.write(json.dumps(data_item) + "\n")
+
+                    data_index = {"by_name": {}}
                     for data_item in data_sections:
-                        f.write(json.dumps(data_item) + "\n")
+                        if data_item.get("name"):
+                            data_index["by_name"][data_item["name"]] = data_item["ea"]
 
-                data_index = {"by_name": {}}
-                for data_item in data_sections:
-                    if data_item.get("name"):
-                        data_index["by_name"][data_item["name"]] = data_item["ea"]
-
-                with open(self.output_dir / "data_index.json", "w", encoding="utf-8") as f:
-                    json.dump(data_index, f, indent=2)
+                    with open(self.output_dir / "data_index.json", "w", encoding="utf-8") as f:
+                        json.dump(data_index, f, indent=2)
+                if not self.verbose:
+                    console.print(f"[green]✓[/] Extracted [bold]{len(data_sections)}[/bold] data items")
 
                 summary = {
                     "functions_total": len(functions_data),
@@ -906,9 +1001,24 @@ class BinaryArchiveExtractor:
             if self.decompiler:
                 self.decompiler.dispose()
 
+        # Phase 11: Build CAPA summary (outside Ghidra context)
         if metadata:
             try:
-                capa_summary_path = build_capa_summary(self.binary_path, self.output_dir)
+                if not self.verbose:
+                    console.print("🔍 Running CAPA analysis...")
+                capa_summary_path = build_capa_summary(self.binary_path, self.output_dir, verbose=self.verbose)
+                if capa_summary_path and not self.verbose:
+                    # Read the summary to get stats
+                    try:
+                        with capa_summary_path.open() as f:
+                            capa_data = json.load(f)
+                            rules_count = capa_data.get("counts", {}).get("rules", 0)
+                            attack_count = capa_data.get("counts", {}).get("attack_mappings", 0)
+                            console.print(f"[green]✓[/] CAPA found [bold]{rules_count}[/bold] rules, [bold]{attack_count}[/bold] MITRE ATT&CK mappings")
+                    except Exception:
+                        console.print("[green]✓[/] CAPA analysis complete")
+                elif not self.verbose:
+                    console.print("[yellow]⚠[/] CAPA analysis produced no results")
             except Exception as exc:  # pragma: no cover - runtime specific
                 logger.warning("capa summary generation failed: %s", exc)
                 capa_summary_path = None
@@ -918,31 +1028,40 @@ class BinaryArchiveExtractor:
                 with meta_path.open("w", encoding="utf-8") as f:
                     json.dump(metadata, f, indent=2)
 
+        # Copy binary to snapshot
+        if not self.verbose:
+            console.print("📦 Finalizing snapshot...")
         shutil.copy2(self.binary_path, self.output_dir / self.binary_path.name)
 
-        self.log("Creating ZIP archive...")
-        zip_path = self.output_dir.parent / f"{self.binary_path.stem}_archive.zip"
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-            for file_path in self.output_dir.rglob("*"):
-                if file_path.is_file():
-                    arcname = file_path.relative_to(self.output_dir.parent)
-                    zipf.write(file_path, arcname)
+        # Clean up temporary Ghidra project directory
+        ghidra_temp_dir = self.binary_path.parent / f"{self.binary_path.name}_ghidra"
+        if ghidra_temp_dir.exists():
+            try:
+                if not self.verbose:
+                    console.print("🧹 Cleaning up temporary Ghidra files...")
+                shutil.rmtree(ghidra_temp_dir)
+                self.log(f"Removed temporary Ghidra directory: {ghidra_temp_dir}")
+            except Exception as exc:
+                logger.warning("Failed to remove temporary Ghidra directory: %s", exc)
 
-        logger.info("Snapshot extraction complete: %s", self.output_dir)
-        if summary:
-            logger.info(
-                "Functions=%s (decompiled %s) sections=%s imports=%s exports=%s "
-                "call_edges=%s equates=%s strings=%s data_items=%s",
-                summary["functions_total"],
-                summary["functions_decompiled"],
-                summary["sections"],
-                summary["imports"],
-                summary["exports"],
-                summary["call_edges"],
-                summary["equates"],
-                summary["strings"],
-                summary["data_items"],
-            )
+        if self.verbose:
+            logger.info("Snapshot extraction complete: %s", self.output_dir)
+            if summary:
+                logger.info(
+                    "Functions=%s (decompiled %s) sections=%s imports=%s exports=%s "
+                    "call_edges=%s equates=%s strings=%s data_items=%s",
+                    summary["functions_total"],
+                    summary["functions_decompiled"],
+                    summary["sections"],
+                    summary["imports"],
+                    summary["exports"],
+                    summary["call_edges"],
+                    summary["equates"],
+                    summary["strings"],
+                    summary["data_items"],
+                )
+        else:
+            console.print(f"[bold green]✓ Snapshot extraction complete:[/] {self.output_dir.name}")
 
         return self.output_dir
 
@@ -951,11 +1070,11 @@ def build_snapshot(
     binary_path: Path, output_dir: Path | None = None, verbose: bool = False
 ) -> Path:
     """
-    Run analysis and produce a <binary>_archive directory.
+    Run analysis and produce a <binary>.snapshot directory.
 
     Args:
         binary_path: Input binary to analyze.
-        output_dir: Optional directory to create (defaults to sibling <name>_archive).
+        output_dir: Optional directory to create (defaults to sibling <name>.snapshot).
         verbose: Enable verbose logging.
 
     Returns:

@@ -10,7 +10,7 @@ from kernagent.snapshot.tools import SnapshotTools
 @pytest.fixture
 def snapshot():
     """Create SnapshotTools instance with test fixture."""
-    archive = Path(__file__).parent / "fixtures" / "bifrose_archive"
+    archive = Path(__file__).parent / "fixtures" / "bifrose.snapshot"
     return SnapshotTools(archive)
 
 

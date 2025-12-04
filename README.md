@@ -1,15 +1,15 @@
 <div align="center">
 
 <pre>
-     _                                            _
-    | | _____ _ __ _ __   __ _  __ _  ___ _ __ | |_
-    | |/ / _ \ '__| '_ \ / _` |/ _` |/ _ \ '_ \| __|
-    |   <  __/ |  | | | | (_| | (_| |  __/ | | | |_
-    |_|\_\___|_|  |_| |_|\__,_|\__, |\___|_| |_|\__|
-                                |___/
+ _  __                                      _
+| |/ /   ___   _ __   _ __    __ _    __ _ | |_
+| ' /   / _ \ | '__| | '_ \  / _` |  / _` ||  _|
+| . \  |  __/ | |    | | | || (_| | | (_| || |_
+|_|\_\  \___| |_|    |_| |_| \__,_|  \__, | \__|
+                                     |___/
 </pre>
 
-# 🔍 kernagent
+# kernagent
 
 [![CI](https://github.com/Karib0u/kernagent/workflows/CI/badge.svg)](https://github.com/Karib0u/kernagent/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Karib0u/kernagent?include_prereleases)](https://github.com/Karib0u/kernagent/releases)
@@ -18,49 +18,112 @@
 
 **Turn binaries into conversations — deterministic, auditable, offline-capable.**
 
-`kernagent` converts a binary into a **portable static snapshot** and lets an LLM (or your scripts) answer questions **with evidence**.
-
-No live IDE • No GUI automation • No hallucinations
-
-*Offline-capable:* run fully local using an OpenAI-compatible endpoint (e.g., Ollama, LM Studio); no internet required.
-
 </div>
 
 ---
 
-## Why kernagent?
+## Quick Start
 
-* **Headless by design** — runs in CI/Docker; no IDA/Ghidra UI, no MCP required
-* **Evidence over vibes** — every answer cites functions, xrefs, imports, strings, and **decompilation snippets**
-* **Deterministic & portable** — same binary → same snapshot → same report; easy to diff and archive
-* **Model-agnostic** — works with any `/v1/chat/completions` LLM endpoint (OpenAI, Gemini, Ollama, LM Studio, your gateway)
+```bash
+# Install
+bash <(curl -fsSL https://raw.githubusercontent.com/Karib0u/kernagent/main/install.sh)
+
+# Configure
+kernagent init
+
+# Analyze
+kernagent analyze /path/to/binary
+```
+
+That's it.
 
 ---
 
-## 🚀 Quick start
+## What is kernagent?
+
+`kernagent` converts a binary into a **portable static snapshot** and lets an LLM answer questions **with evidence**.
+
+- **Headless** — runs in CI/Docker; no IDE or GUI required
+- **Evidence-based** — every answer cites functions, xrefs, imports, strings, and decompilation
+- **Deterministic** — same binary → same snapshot → same report
+- **Model-agnostic** — works with any OpenAI-compatible endpoint (OpenAI, Gemini, Ollama, LM Studio)
+
+---
+
+## Commands
+
+### `init`
+
+Interactive configuration wizard. Sets up your LLM provider with model auto-discovery.
+
+```bash
+kernagent init
+```
+
+### `analyze`
+
+One-click threat assessment. Produces a structured security report with streaming output.
+
+```bash
+kernagent analyze /path/to/binary
+
+# Raw JSON for automation
+kernagent analyze /path/to/binary --json
+```
+
+### `chat`
+
+Interactive reverse engineering session. Ask questions, explore the binary, get cited answers.
+
+```bash
+kernagent chat /path/to/binary
+```
+
+Inside the session:
+```
+kernagent >> What does this binary do?
+kernagent >> Show me the network functions
+kernagent >> exit
+```
+
+### `snapshot`
+
+Manual snapshot management.
+
+```bash
+# Build snapshot
+kernagent snapshot /path/to/binary
+
+# List snapshots in current directory
+kernagent snapshot --list
+
+# Force rebuild
+kernagent snapshot /path/to/binary --force
+```
+
+### Global Options
+
+```bash
+kernagent -v --model gpt-4o \
+  --base-url https://api.openai.com/v1 \
+  --api-key sk-... \
+  analyze /path/to/binary
+```
+
+---
+
+## Installation
 
 ### Requirements
 
-* Docker (Engine or Desktop) and Git
-* 64-bit OS (x86_64 or ARM64)
-* 4 GB RAM (8+ GB recommended for large samples)
-* Access to an LLM endpoint (internet or a local `/v1/chat/completions` gateway like Ollama or LM Studio)
+- Docker (Engine or Desktop)
+- 64-bit OS (x86_64 or ARM64)
+- 4 GB RAM (8+ GB recommended for large samples)
 
-### Installation
-
-Pick the flow that matches your tooling. All options mount `~/.config/kernagent/config.env` so you configure credentials once.
-
-#### Option 1 — `install.sh` wrapper (Linux / macOS / WSL2)
+### Option 1 — Install Script (Recommended)
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Karib0u/kernagent/main/install.sh)
-```
-
-If the one-liner is blocked:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Karib0u/kernagent/main/install.sh -o install.sh
-bash install.sh
 ```
 
 Or clone first:
@@ -71,271 +134,103 @@ cd kernagent
 bash install.sh
 ```
 
-The install script does the following (fully auditable in `scripts/`):
-
-1. Checks that Docker is installed and running
-2. Pulls the pre-built `ghcr.io/karib0u/kernagent:latest` image from GitHub Container Registry (no build step)
-3. Installs these shell scripts to `/usr/local/bin/`:
-   - `kernagent` — main CLI wrapper (auto-mounts binaries and config)
-   - `kernagent-config` — interactive config editor
-   - `kernagent-update` — update to latest/tagged version
-   - `kernagent-uninstall` — remove all installed files
-4. Saves version info to `~/.config/kernagent/.version`
-
-All scripts are plain shell code you can review in `scripts/` before running. No sudo required unless `/usr/local/bin` is not writable.
-
-##### Advanced — pin install to a tag/commit
-
-To install a specific version of the wrapper and image, point the bootstrapper at a tagged script and pass the tag:
+Then configure:
 
 ```bash
-KERNAGENT_INSTALL_URL="https://raw.githubusercontent.com/Karib0u/kernagent/vX.Y.Z/scripts/install.sh" \
-  bash <(curl -fsSL https://raw.githubusercontent.com/Karib0u/kernagent/main/install.sh) --tag vX.Y.Z
+kernagent init
 ```
 
-You can also pin to an exact commit by replacing `vX.Y.Z` with a commit SHA in the raw URL.
-
-#### Option 2 — Docker Compose (Linux / macOS / Windows + Docker Desktop)
+### Option 2 — Docker Compose
 
 ```bash
 git clone https://github.com/Karib0u/kernagent.git
 cd kernagent
-mkdir -p ~/.config/kernagent
-cp config.env.example ~/.config/kernagent/config.env
-
-# Pull pre-built image (recommended)
 docker compose pull
-
-# Or build locally for development
-docker compose build
-
-docker compose run --rm kernagent --help
+docker compose run --rm kernagent init
 ```
 
-Analyze binaries by mounting their directory under `/data`:
+### Option 3 — Direct Docker
 
 ```bash
-docker compose run --rm \
-  -v /absolute/path/to/binaries:/data \
-  kernagent summary /data/sample.exe
-```
-
-On Windows (PowerShell + Docker Desktop), use Windows-style absolute paths like `C:\malware:/data`.
-
-#### Option 3 — Direct Docker (any OS with Docker)
-
-**Pull pre-built image (recommended):**
-
-```bash
-mkdir -p ~/.config/kernagent
-curl -fsSL https://raw.githubusercontent.com/Karib0u/kernagent/main/config.env.example \
-  -o ~/.config/kernagent/config.env
-
 docker pull ghcr.io/karib0u/kernagent:latest
-docker run --rm \
-  -v /absolute/path/to/binaries:/data \
-  -v ~/.config/kernagent/config.env:/config/config.env:ro \
-  ghcr.io/karib0u/kernagent:latest summary /data/sample.exe
-```
 
-**Or build locally:**
-
-```bash
-git clone https://github.com/Karib0u/kernagent.git
-cd kernagent
-docker build -t kernagent:local .
-docker run --rm \
-  -v /absolute/path/to/binaries:/data \
-  -v ~/.config/kernagent/config.env:/config/config.env:ro \
-  kernagent:local summary /data/sample.exe
-```
-
-### Verify install
-
-**Option 1** (wrapper):
-
-```bash
-kernagent --help
-kernagent --version
-```
-
-Run directly:
-
-```bash
-kernagent summary /path/to/binary.exe
-kernagent ask /path/to/binary.exe "What does this binary do?"
-kernagent oneshot /path/to/binary.exe
-```
-
-**Options 2 or 3** (Docker Compose / raw Docker):
-
-Verify by running help:
-
-```bash
-# Docker Compose
-docker compose run --rm kernagent --help
-
-# Raw Docker
-docker run --rm ghcr.io/karib0u/kernagent:latest --help
-```
-
-### Uninstall
-
-**Option 1** (wrapper):
-
-```bash
-kernagent-uninstall
-```
-
-**Options 2 or 3** (Docker Compose / raw Docker):
-
-Just delete the clone and remove the images:
-
-```bash
-docker image rm ghcr.io/karib0u/kernagent:latest
-# or
-docker image rm kernagent:local
-```
-
-### Update
-
-**Option 1** (wrapper):
-
-```bash
-kernagent-update          # switch to latest
-kernagent-update --check  # check only
-kernagent-update --tag vX.Y.Z  # pin to specific version
-```
-
-**Options 2 or 3** (Docker Compose / raw Docker):
-
-Re-run `docker compose pull` or `docker pull ghcr.io/karib0u/kernagent:latest`.
-
----
-
-## Screenshots
-
-**Summary** — executive overview with cited artifacts
-![Summary](docs/images/summary.png)
-
-**Ask** — focused Q&A with xrefs/**decompilation** slices
-![Ask](docs/images/ask.png)
-
----
-
-## Commands
-
-> **First run** — if no `<name>_archive/` snapshot exists, `kernagent` builds it automatically before answering
-
-### `summary`
-
-Executive overview: purpose, capabilities, key functions/imports/strings, with addresses to verify
-
-```bash
-kernagent summary /path/to/binary
-# raw JSON (for automation)
-kernagent summary /path/to/binary --json
-```
-
-### `ask`
-
-Interactive Q&A over the snapshot using safe tools (search functions/strings/imports, follow call graph, read **decompilation**, resolve xrefs)
-
-```bash
-kernagent ask /path/to/binary "Show suspected C2 logic and evidence."
-```
-
-### `oneshot`
-
-Deterministic triage report for CI/bulk analysis. Classification:
-`MALICIOUS | GRAYWARE | BENIGN | UNKNOWN`
-
-```bash
-kernagent oneshot /path/to/binary
-# raw JSON (for automation)
-kernagent oneshot /path/to/binary --json
-```
-
-Global overrides (any command):
-
-```bash
-# verbosity and per-run model/API overrides
-kernagent -v --model gpt-4o \
-  --base-url https://api.openai.com/v1 \
-  --api-key sk-... \
-  summary /path/to/binary
+docker run -it --rm \
+  -v /path/to/binaries:/data \
+  -v ~/.config/kernagent/config.env:/config/config.env \
+  ghcr.io/karib0u/kernagent:latest analyze /data/sample.exe
 ```
 
 ---
 
-## How it works (20-second overview)
+## How It Works
 
-1. **Extract once** — build a static snapshot with Ghidra/PyGhidra; CAPA rules add capability hints
-2. **Read-only tools** — a bounded agent (or your scripts) traverses the snapshot safely
-3. **Cited answers** — results always reference concrete artifacts (EAs, names, strings, APIs)
-
-**Snapshot layout (subset)**
+1. **Snapshot** — Ghidra extracts functions, strings, imports, call graph, and decompilation
+2. **Prune** — Key artifacts are scored and selected for LLM context
+3. **Analyze** — LLM produces cited findings; chat mode enables follow-up questions
 
 ```
-<name>_archive/
-├─ meta.json
-├─ functions.jsonl
-├─ strings.jsonl
-├─ imports_exports.json
-├─ callgraph.jsonl
-├─ capa_summary.json
-└─ decomp/*.c
+binary.exe
+    ↓
+binary.snapshot/
+├── meta.json
+├── functions.jsonl
+├── strings.jsonl
+├── imports_exports.json
+├── callgraph.jsonl
+├── capa_summary.json
+└── decomp/*.c
+    ↓
+Threat Report / Chat Session
 ```
 
 ---
 
-## Model configuration
+## Configuration
 
-Create once (outside the repo). Fast path:
+### Quick Setup
 
 ```bash
-kernagent-config
+kernagent init
 ```
 
-Or edit the file manually:
+### Manual Setup
 
 ```bash
 mkdir -p ~/.config/kernagent
-cp config.env.example ~/.config/kernagent/config.env
-$EDITOR ~/.config/kernagent/config.env
+cat > ~/.config/kernagent/config.env << 'EOF'
+OPENAI_API_KEY=your-key
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o
+EOF
 ```
 
-Override via env vars:
+### Environment Variables
 
 ```bash
 export OPENAI_API_KEY=...
-export OPENAI_BASE_URL=https://api.openai.com/v1   # or your gateway
-export OPENAI_MODEL=gpt-4o                        # or your local model
+export OPENAI_BASE_URL=https://api.openai.com/v1
+export OPENAI_MODEL=gpt-4o
 ```
 
-Any `/v1/chat/completions`-compatible endpoint works.
+Any `/v1/chat/completions`-compatible endpoint works (OpenAI, Anthropic, Google, Ollama, LM Studio).
 
 ---
 
-## Comparisons (TL;DR)
+## Update & Uninstall
 
-* **MCP/IDE plugins** — need a running disassembler and project, often GUI-bound
-* **kernagent** — runs headless and emits a portable snapshot you can analyze anywhere, including air-gapped
+```bash
+# Update to latest
+kernagent-update
 
----
+# Check for updates
+kernagent-update --check
 
-## Design guarantees
+# Pin to specific version
+kernagent-update --tag vX.Y.Z
 
-* **Read-only**
-* **Static-only**
-* **Deterministic**
-* **Auditable**
-
----
-
-## Contributing
-
-PRs welcome
+# Uninstall
+kernagent-uninstall
+```
 
 ---
 
