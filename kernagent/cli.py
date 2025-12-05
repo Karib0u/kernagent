@@ -13,11 +13,12 @@ from pathlib import Path
 import httpx
 
 from .agent import ReverseEngineeringAgent
+from .context import ensure_context, ensure_oneshot_summary
 from .config import Settings, load_settings
 from .llm_client import LLMClient
 from .log import get_logger, setup_logging
-from .oneshot import OneshotPruningError, build_oneshot_summary
-from .prompts import ANALYZE_SYSTEM_PROMPT, SYSTEM_PROMPT, TOOLS
+from .oneshot import OneshotPruningError
+from .prompts import ANALYZE_SYSTEM_PROMPT, TOOLS
 from .snapshot import SnapshotError, SnapshotTools, build_snapshot, build_tool_map
 
 logger = get_logger(__name__)
@@ -158,6 +159,11 @@ def build_parser() -> argparse.ArgumentParser:
     analyze = subparsers.add_parser("analyze", help="One-click threat assessment.")
     analyze.add_argument("binary", type=Path, help="Path to the binary.")
     analyze.add_argument("--json", action="store_true", help="Output raw JSON.")
+    analyze.add_argument(
+        "--full",
+        action="store_true",
+        help="Build a full multi-agent context (BINARY_CONTEXT.md) in addition to the summary.",
+    )
 
     # chat command
     chat = subparsers.add_parser("chat", help="Interactive RE session.")
@@ -270,7 +276,13 @@ def run_init() -> None:
     print()
 
 
-def run_analyze(binary_path: Path, settings: Settings, verbose: bool, json_output: bool) -> None:
+def run_analyze(
+    binary_path: Path,
+    settings: Settings,
+    verbose: bool,
+    json_output: bool,
+    full: bool,
+) -> None:
     """One-click threat assessment."""
     snapshot_dir = _snapshot_dir_for(binary_path)
 
@@ -278,7 +290,10 @@ def run_analyze(binary_path: Path, settings: Settings, verbose: bool, json_outpu
         print("🔨 Building snapshot...", file=sys.stderr)
         snapshot_dir = build_snapshot(binary_path, verbose=verbose)
 
-    summary = build_oneshot_summary(snapshot_dir, verbose=verbose)
+    context_level = "full" if full else "basic"
+    context_path = ensure_context(snapshot_dir, settings, level=context_level, verbose=verbose)
+    context_text = context_path.read_text(encoding="utf-8")
+    summary = ensure_oneshot_summary(snapshot_dir, verbose=verbose)
 
     if json_output:
         print(json.dumps(summary, indent=2))
@@ -292,6 +307,10 @@ def run_analyze(binary_path: Path, settings: Settings, verbose: bool, json_outpu
         verbose=verbose,
         messages=[
             {"role": "system", "content": ANALYZE_SYSTEM_PROMPT},
+            {
+                "role": "system",
+                "content": "Pre-analysis context for this binary (BINARY_CONTEXT.md):\n\n" + context_text,
+            },
             {"role": "user", "content": payload},
         ],
         temperature=0,
@@ -300,6 +319,7 @@ def run_analyze(binary_path: Path, settings: Settings, verbose: bool, json_outpu
         sys.stdout.flush()
     sys.stdout.write("\n")  # Final newline
     sys.stdout.flush()
+    print(f"Context written to: {context_path}")
 
 
 def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
@@ -310,10 +330,25 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
         print("🔨 Building snapshot...", file=sys.stderr)
         snapshot_dir = build_snapshot(binary_path, verbose=verbose)
 
+    context_path = ensure_context(snapshot_dir, settings, level="basic", verbose=verbose)
+    context_text = context_path.read_text(encoding="utf-8")
+
     snapshot = SnapshotTools(snapshot_dir)
     tool_map = build_tool_map(snapshot)
     llm = LLMClient(settings)
-    agent = ReverseEngineeringAgent(llm, TOOLS, tool_map)
+
+    def _make_agent() -> ReverseEngineeringAgent:
+        base_agent = ReverseEngineeringAgent(llm, TOOLS, tool_map)
+        base_agent.messages.insert(
+            1,
+            {
+                "role": "system",
+                "content": "Pre-analysis context for this specific binary:\n\n" + context_text,
+            },
+        )
+        return base_agent
+
+    agent = _make_agent()
 
     print(f"\nkernagent chat session for {binary_path.name}")
     print("Type 'exit', 'quit', or Ctrl+D to exit. 'clear' to reset.\n")
@@ -330,7 +365,7 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
         if user_input.lower() in ("exit", "quit"):
             break
         if user_input.lower() == "clear":
-            agent = ReverseEngineeringAgent(llm, TOOLS, tool_map)
+            agent = _make_agent()
             print("Session cleared.\n")
             continue
 
@@ -430,14 +465,15 @@ def main() -> None:
     if args.command == "analyze":
         try:
             json_output = getattr(args, "json", False)
-            run_analyze(binary_path, settings, args.verbose, json_output)
+            full = getattr(args, "full", False)
+            run_analyze(binary_path, settings, args.verbose, json_output, full)
         except (SnapshotError, OneshotPruningError) as exc:
             logger.error("Analysis failed: %s", exc)
             raise SystemExit(str(exc)) from exc
     elif args.command == "chat":
         try:
             run_chat(binary_path, settings, args.verbose)
-        except SnapshotError as exc:
+        except (SnapshotError, OneshotPruningError) as exc:
             logger.error("Chat failed: %s", exc)
             raise SystemExit(str(exc)) from exc
     else:  # pragma: no cover

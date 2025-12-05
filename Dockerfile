@@ -117,6 +117,7 @@ COPY kernagent/__init__.py \
      kernagent/agent.py \
      kernagent/capa_runner.py \
      kernagent/cli.py \
+     kernagent/context.py \
      kernagent/config.py \
      kernagent/llm_client.py \
      kernagent/log.py \

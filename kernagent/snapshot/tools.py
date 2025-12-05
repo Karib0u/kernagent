@@ -212,6 +212,23 @@ class SnapshotTools:
         except (json.JSONDecodeError, ValueError) as exc:
             return {"error": f"Invalid JSON in capa_summary.json: {exc}"}
 
+    def get_binary_context(self) -> Dict[str, Any]:
+        """Return the persisted BINARY_CONTEXT.md content if present."""
+
+        path = self.root / "BINARY_CONTEXT.md"
+        if not path.exists():
+            return {"error": "BINARY_CONTEXT.md not found"}
+
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            return {"error": f"Failed to read BINARY_CONTEXT.md: {exc}"}
+
+        return {
+            "content": text,
+            "lines": len(text.splitlines()),
+        }
+
     def list_files(self, directory: str = ".", pattern: str = "*") -> Dict[str, Any]:
         try:
             root = self._resolve(".")
@@ -1290,4 +1307,5 @@ def build_tool_map(snapshot: SnapshotTools) -> Dict[str, Any]:
         "get_xrefs": snapshot.get_xrefs,
         "search_decomp": snapshot.search_decomp,
         "get_capa_summary": snapshot.get_capa_summary,
+        "get_binary_context": snapshot.get_binary_context,
     }
