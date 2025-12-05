@@ -287,7 +287,7 @@ def run_analyze(binary_path: Path, settings: Settings, verbose: bool, json_outpu
     llm = LLMClient(settings)
     payload = json.dumps(summary, indent=2)
 
-    # Stream the response
+    # Stream the response with explicit unbuffered output for Docker compatibility
     for chunk in llm.chat_stream(
         verbose=verbose,
         messages=[
@@ -296,8 +296,10 @@ def run_analyze(binary_path: Path, settings: Settings, verbose: bool, json_outpu
         ],
         temperature=0,
     ):
-        print(chunk, end="", flush=True)
-    print()  # Final newline
+        sys.stdout.write(chunk)
+        sys.stdout.flush()
+    sys.stdout.write("\n")  # Final newline
+    sys.stdout.flush()
 
 
 def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
@@ -343,14 +345,30 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
 def run_snapshot(binary_path: Path | None, list_mode: bool, force: bool, verbose: bool) -> None:
     """Snapshot management."""
     if list_mode or binary_path is None:
-        # List all .snapshot directories in current folder
-        snapshots = list(Path.cwd().glob("*.snapshot"))
+        # List all .snapshot directories (current dir + subdirs)
+        # Also check /data for Docker environments where host dir is mounted there
+        search_paths = [Path.cwd()]
+        data_path = Path("/data")
+        if data_path.exists() and data_path.is_dir():
+            search_paths.append(data_path)
+
+        snapshots: set[Path] = set()
+        for base in search_paths:
+            snapshots |= set(base.glob("*.snapshot")) | set(base.glob("**/*.snapshot"))
         if not snapshots:
-            print("No snapshots found in current directory.")
+            print("No snapshots found.")
             return
         print("Snapshots:")
         for s in sorted(snapshots):
-            print(f"  {s.name}")
+            # Show relative path from cwd or /data
+            try:
+                rel = s.relative_to(Path.cwd())
+            except ValueError:
+                try:
+                    rel = s.relative_to(data_path)
+                except ValueError:
+                    rel = s
+            print(f"  {rel}")
         return
 
     snapshot_dir = _snapshot_dir_for(binary_path)

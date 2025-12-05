@@ -142,5 +142,6 @@ ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 VOLUME /data
 
 # Run the CLI directly from the virtual environment
-ENTRYPOINT ["python", "-m", "kernagent.cli"]
+# -u flag forces unbuffered stdout/stderr for reliable streaming in Docker
+ENTRYPOINT ["python", "-u", "-m", "kernagent.cli"]
 CMD ["--help"]
