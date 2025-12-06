@@ -14,223 +14,190 @@
 [![CI](https://github.com/Karib0u/kernagent/workflows/CI/badge.svg)](https://github.com/Karib0u/kernagent/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Karib0u/kernagent?include_prereleases)](https://github.com/Karib0u/kernagent/releases)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?logo=docker\&logoColor=white)](https://github.com/Karib0u/kernagent/pkgs/container/kernagent)
+[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?logo=docker&logoColor=white)](https://github.com/Karib0u/kernagent/pkgs/container/kernagent)
 
-**Turn binaries into conversations — deterministic, auditable, offline-capable.**
+**Turn binaries into conversations.**  
+A deterministic, evidence-based reverse engineering agent powered by Ghidra and modern LLMs.
+
+[Quick Start](#quick-start) • [Features](#features) • [Usage](#usage) • [Configuration](#configuration)
 
 </div>
 
 ---
 
-## Quick Start
+## ⚡ Quick Start
+
+Install the wrapper script:
 
 ```bash
-# Install
 bash <(curl -fsSL https://raw.githubusercontent.com/Karib0u/kernagent/main/install.sh)
+````
 
-# Configure
+Configure your provider (OpenAI, Claude, Gemini, Local/Ollama):
+
+```bash
 kernagent init
-
-# Analyze
-kernagent analyze /path/to/binary
 ```
 
-That's it.
+Analyze a binary:
+
+```bash
+kernagent analyze ./malware.exe
+```
 
 ---
 
-## What is kernagent?
+## 📸 The Workflow
 
-`kernagent` converts a binary into a **portable static snapshot** and lets an LLM answer questions **with evidence**.
+### 1. Threat Assessment (`analyze`)
 
-- **Headless** — runs in CI/Docker; no IDE or GUI required
-- **Evidence-based** — every answer cites functions, xrefs, imports, strings, and decompilation
-- **Deterministic** — same binary → same snapshot → same report
-- **Model-agnostic** — works with any OpenAI-compatible endpoint (OpenAI, Gemini, Ollama, LM Studio)
+Produces a detailed, evidence-backed security report summarizing capabilities, indicators, strings, heuristics, and ATT&CK mappings.
+
+<div align="center">
+  <img src="docs/images/summary.png" alt="kernagent analysis output" width="700">
+</div>
+
+### 2. Interactive Investigation (`chat`)
+
+Ask follow-up questions with full access to the extracted snapshot (functions, decompilation, strings, cross-references, traces).
+
+<div align="center">
+  <img src="docs/images/ask.png" alt="kernagent chat session" width="700">
+</div>
 
 ---
 
-## Commands
+## ✨ Features
+
+* **Headless & Portable**: Runs entirely inside Docker; no host Ghidra installation required.
+* **Evidence-Based**: Every conclusion is backed by exact references (addresses, API imports, strings).
+* **Deterministic Snapshots**: The first pass extracts a complete static snapshot (Ghidra output, CAPA rules, decompiled functions). Subsequent runs reuse it instantly.
+* **Model Agnostic**: Works with the 2025 frontier models: **Gemini 3 Pro**, **Claude 4.5 Opus/Sonnet**, **GPT-5.1**, or high-performance local models like **Qwen 3** and **DeepSeek V3**.
+* **Structured Output**: Produce readable Markdown reports or machine-friendly JSON.
+
+---
+
+## 🚀 Usage
 
 ### `init`
 
-Interactive configuration wizard. Sets up your LLM provider with model auto-discovery.
+Interactive configuration wizard.
 
 ```bash
 kernagent init
 ```
 
+---
+
 ### `analyze`
 
-One-click threat assessment. Produces a structured security report with streaming output.
-
 ```bash
+# Standard analysis with streaming output
 kernagent analyze /path/to/binary
 
-# Raw JSON for automation
-kernagent analyze /path/to/binary --json
+# Deep-dive mode (more context, slower)
+kernagent analyze /path/to/binary --full
+
+# JSON output for CI integrations
+kernagent analyze /path/to/binary --json > report.json
 ```
+
+---
 
 ### `chat`
 
-Interactive reverse engineering session. Ask questions, explore the binary, get cited answers.
+Start an interactive REPL with full access to snapshot tools.
 
 ```bash
 kernagent chat /path/to/binary
 ```
 
-Inside the session:
-```
-kernagent >> What does this binary do?
-kernagent >> Show me the network functions
-kernagent >> exit
-```
+---
 
 ### `snapshot`
 
-Manual snapshot management.
+Manage extraction artifacts manually.
 
 ```bash
-# Build snapshot
+# Create snapshot
 kernagent snapshot /path/to/binary
 
-# List snapshots in current directory
+# List all snapshots
 kernagent snapshot --list
 
-# Force rebuild
+# Force re-extraction
 kernagent snapshot /path/to/binary --force
 ```
 
-### Global Options
+---
 
-```bash
-kernagent -v --model gpt-4o \
-  --base-url https://api.openai.com/v1 \
-  --api-key sk-... \
-  analyze /path/to/binary
-```
+## ⚙️ Configuration
+
+You can configure `kernagent` via the interactive `init` wizard, environment variables, or CLI flags.
+
+### Supported Providers
+
+* **Google** — Gemini 3 Pro, Gemini 2.5 Flash
+* **Anthropic** — Claude 4.5 Opus, Claude 4.5 Sonnet
+* **OpenAI** — GPT-5.1, o3
+* **Local / Open Weights** — Llama, DeepSeek V3, Qwen 3
 
 ---
 
-## Installation
+### Manual Configuration
 
-### Requirements
+Create or edit:
 
-- Docker (Engine or Desktop)
-- 64-bit OS (x86_64 or ARM64)
-- 4 GB RAM (8+ GB recommended for large samples)
-
-### Option 1 — Install Script (Recommended)
+```
+~/.config/kernagent/config.env
+```
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/Karib0u/kernagent/main/install.sh)
-```
-
-Or clone first:
-
-```bash
-git clone https://github.com/Karib0u/kernagent.git
-cd kernagent
-bash install.sh
-```
-
-Then configure:
-
-```bash
-kernagent init
-```
-
-### Option 2 — Docker Compose
-
-```bash
-git clone https://github.com/Karib0u/kernagent.git
-cd kernagent
-docker compose pull
-docker compose run --rm kernagent init
-```
-
-### Option 3 — Direct Docker
-
-```bash
-docker pull ghcr.io/karib0u/kernagent:latest
-
-docker run -it --rm \
-  -v /path/to/binaries:/data \
-  -v ~/.config/kernagent/config.env:/config/config.env \
-  ghcr.io/karib0u/kernagent:latest analyze /data/sample.exe
-```
-
----
-
-## How It Works
-
-1. **Snapshot** — Ghidra extracts functions, strings, imports, call graph, and decompilation
-2. **Prune** — Key artifacts are scored and selected for LLM context
-3. **Analyze** — LLM produces cited findings; chat mode enables follow-up questions
-
-```
-binary.exe
-    ↓
-binary.snapshot/
-├── meta.json
-├── functions.jsonl
-├── strings.jsonl
-├── imports_exports.json
-├── callgraph.jsonl
-├── capa_summary.json
-└── decomp/*.c
-    ↓
-Threat Report / Chat Session
-```
-
----
-
-## Configuration
-
-### Quick Setup
-
-```bash
-kernagent init
-```
-
-### Manual Setup
-
-```bash
-mkdir -p ~/.config/kernagent
-cat > ~/.config/kernagent/config.env << 'EOF'
-OPENAI_API_KEY=your-key
+# OpenAI / Generic
+OPENAI_API_KEY=sk-...
 OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4o
-EOF
+OPENAI_MODEL=gpt-5.1
+
+# Local LLM (e.g., Ollama running Llama 4 or DeepSeek V3)
+# OPENAI_API_KEY=not-needed
+# OPENAI_BASE_URL=http://host.docker.internal:11434/v1
+# OPENAI_MODEL=deepseek-v3
 ```
-
-### Environment Variables
-
-```bash
-export OPENAI_API_KEY=...
-export OPENAI_BASE_URL=https://api.openai.com/v1
-export OPENAI_MODEL=gpt-4o
-```
-
-Any `/v1/chat/completions`-compatible endpoint works (OpenAI, Anthropic, Google, Ollama, LM Studio).
 
 ---
 
-## Update & Uninstall
+### Runtime Overrides
 
 ```bash
-# Update to latest
+kernagent --model claude-4-5-sonnet-20250620 analyze ./sample.bin
+```
+
+---
+
+## 📦 Updates
+
+```bash
+# Update to latest stable
 kernagent-update
 
-# Check for updates
-kernagent-update --check
-
-# Pin to specific version
-kernagent-update --tag vX.Y.Z
-
-# Uninstall
-kernagent-uninstall
+# Install a specific release
+kernagent-update --tag v1.0.2
 ```
+
+---
+
+## 🏗 Architecture
+
+1. **Extraction**
+   Ghidra (via PyGhidra) + CAPA extract annotated functions, strings, cross-references, decompilation, and heuristics.
+
+2. **Pruning**
+   Intelligent relevance filtering selects suspicious code regions, APIs, constants, and entry points to fit the LLM context budget.
+
+3. **Reasoning**
+
+   * **One-Shot Mode**: Generates a threat assessment from the pruned snapshot.
+   * **Chat Mode**: Uses tools (`search_functions`, `trace_calls`, etc.) to explore code interactively.
 
 ---
 

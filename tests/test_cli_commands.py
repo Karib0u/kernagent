@@ -231,10 +231,19 @@ class TestAnalyzeCommand:
         binary_path = fixture_archive.parent / "bifrose"
 
         with mock.patch("kernagent.cli._snapshot_dir_for", return_value=fixture_archive):
-            run_analyze(binary_path, mock_settings, verbose=False, json_output=True)
+            with mock.patch("kernagent.cli.ensure_context") as mock_ensure_context:
+                # Mock context path
+                mock_ctx_path = fixture_archive / "BINARY_CONTEXT.md"
+                mock_ctx_path.write_text("# Mock context")
+                mock_ensure_context.return_value = mock_ctx_path
+
+                run_analyze(binary_path, mock_settings, verbose=False, json_output=True, full=False)
 
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        # Extract JSON from output (may have console status messages before it)
+        json_start = captured.out.find("{")
+        json_str = captured.out[json_start:]
+        output = json.loads(json_str)
 
         assert "file" in output
         assert "sections" in output
@@ -244,16 +253,23 @@ class TestAnalyzeCommand:
         binary_path = fixture_archive.parent / "bifrose"
 
         with mock.patch("kernagent.cli._snapshot_dir_for", return_value=fixture_archive):
-            with mock.patch("kernagent.cli.LLMClient") as mock_llm_class:
-                mock_llm = mock.Mock()
-                mock_llm.chat_stream.return_value = iter(["Threat ", "assessment ", "complete."])
-                mock_llm_class.return_value = mock_llm
+            with mock.patch("kernagent.cli.ensure_context") as mock_ensure_context:
+                with mock.patch("kernagent.cli.LLMClient") as mock_llm_class:
+                    # Mock context
+                    mock_ctx_path = fixture_archive / "BINARY_CONTEXT.md"
+                    mock_ctx_path.write_text("# Mock context")
+                    mock_ensure_context.return_value = mock_ctx_path
 
-                run_analyze(binary_path, mock_settings, verbose=False, json_output=False)
+                    # Mock LLM
+                    mock_llm = mock.Mock()
+                    mock_llm.chat_stream.return_value = iter(["Threat ", "assessment ", "complete."])
+                    mock_llm_class.return_value = mock_llm
 
-                captured = capsys.readouterr()
-                assert "Threat assessment complete." in captured.out
-                mock_llm.chat_stream.assert_called_once()
+                    run_analyze(binary_path, mock_settings, verbose=False, json_output=False, full=False)
+
+                    captured = capsys.readouterr()
+                    assert "Threat assessment complete." in captured.out
+                    mock_llm.chat_stream.assert_called_once()
 
 
 # ============================================================================
@@ -297,7 +313,7 @@ class TestSnapshotCommand:
         run_snapshot(binary, list_mode=False, force=False, verbose=False)
 
         captured = capsys.readouterr()
-        assert "Snapshot exists" in captured.out
+        assert "already exists" in captured.out.lower()
         assert "--force" in captured.out
 
     @mock.patch("kernagent.cli.build_snapshot")
