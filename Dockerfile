@@ -117,8 +117,10 @@ COPY kernagent/__init__.py \
      kernagent/agent.py \
      kernagent/capa_runner.py \
      kernagent/cli.py \
+     kernagent/cli_app.py \
      kernagent/context.py \
      kernagent/config.py \
+     kernagent/events.py \
      kernagent/llm_client.py \
      kernagent/log.py \
      kernagent/prompts.py \
@@ -144,5 +146,5 @@ VOLUME /data
 
 # Run the CLI directly from the virtual environment
 # -u flag forces unbuffered stdout/stderr for reliable streaming in Docker
-ENTRYPOINT ["python", "-u", "-m", "kernagent.cli"]
+ENTRYPOINT ["python", "-u", "-m", "kernagent"]
 CMD ["--help"]

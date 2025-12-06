@@ -1,6 +1,6 @@
 """Allow `python -m kernagent` to invoke the CLI."""
 
-from .cli import main
+from .cli_app import main
 
 
 def run() -> None:

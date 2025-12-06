@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import getpass
 import json
 import os
 import shutil
@@ -185,8 +184,20 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run_init() -> None:
     """Interactive configuration wizard with premium UX."""
-    print(KERNAGENT_BANNER)
-    print("Welcome! Let's configure your LLM provider.\n")
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.prompt import Prompt
+
+    console = Console()
+
+    # Display welcome banner
+    console.print(Panel.fit(
+        KERNAGENT_BANNER + "\n[dim]Static Binary Analysis Assistant[/dim]",
+        border_style="blue",
+        padding=(1, 2)
+    ))
+    console.print("\n[bold cyan]Welcome![/bold cyan] Let's configure your LLM provider.\n")
 
     providers = {
         "1": ("OpenAI", "https://api.openai.com/v1", "gpt-4o"),
@@ -196,61 +207,86 @@ def run_init() -> None:
         "5": ("Custom endpoint", "", ""),
     }
 
-    print("Select your LLM provider:\n")
-    for key, (name, url, _) in providers.items():
-        hint = f"  ({url})" if url else ""
-        print(f"  {key}) {name}{hint}")
+    # Display providers in a table
+    table = Table(title="Available LLM Providers", show_header=True, header_style="bold magenta")
+    table.add_column("Choice", style="cyan", width=8)
+    table.add_column("Provider", style="green")
+    table.add_column("Endpoint", style="dim")
 
-    choice = input("\nProvider [1]: ").strip() or "1"
-    if choice not in providers:
-        choice = "1"
+    for key, (name, url, _) in providers.items():
+        table.add_row(key, name, url or "[dim]Custom[/dim]")
+
+    console.print(table)
+
+    choice = Prompt.ask("\n[bold]Select provider[/bold]", default="1", choices=list(providers.keys()))
 
     name, default_url, default_model = providers[choice]
-    print(f"\n--- {name} Configuration ---\n")
+    console.print(f"\n[bold blue]━━━ {name} Configuration ━━━[/bold blue]\n")
 
     # Get base URL
     if default_url:
-        base_url = input(f"Base URL [{default_url}]: ").strip() or default_url
+        base_url = Prompt.ask("[cyan]Base URL[/cyan]", default=default_url)
     else:
-        base_url = input("Base URL: ").strip()
+        base_url = ""
         while not base_url:
-            print("  Base URL is required.")
-            base_url = input("Base URL: ").strip()
+            base_url = Prompt.ask("[cyan]Base URL[/cyan] (required)")
 
     # Get API key (with masked input)
     if choice in ("1", "2", "3"):  # Cloud providers require key
-        print("\nAPI Key (input hidden):")
-        api_key = getpass.getpass("  > ").strip()
+        api_key = ""
         while not api_key:
-            print("  API key is required for this provider.")
-            api_key = getpass.getpass("  > ").strip()
+            api_key = Prompt.ask("[cyan]API Key[/cyan] (required)", password=True)
     elif choice == "4":  # Local providers don't need API key
         api_key = "not-needed"
+        console.print("[dim]Skipping API key for local provider[/dim]")
     else:  # Custom endpoint - optional
-        api_key = getpass.getpass("API Key (optional, press Enter to skip): ").strip() or "not-needed"
+        api_key = Prompt.ask("[cyan]API Key[/cyan] (optional)", default="not-needed", password=True)
+
+    console.print("[green]✓[/green] Provider configured")
 
     # Convert localhost URLs for Docker compatibility
     docker_base_url = _convert_localhost_for_docker(base_url)
     if docker_base_url != base_url:
-        print(f"  (Using {docker_base_url} for Docker compatibility)")
+        console.print(f"[dim]  Using {docker_base_url} for Docker compatibility[/dim]")
 
     # Fetch and select model
-    print("\nFetching available models...")
+    console.print("\n[yellow]⚙[/yellow]  Fetching available models...")
     models = _fetch_models(docker_base_url, api_key)
 
     if models:
-        print(f"Found {len(models)} models!")
-        model = _select_from_list("Select model", models, default_model)
-    else:
-        if not models and (choice in ("1", "2", "3")):
-            print("Could not fetch models (check API key or endpoint).")
-        if default_model:
-            model = input(f"Model [{default_model}]: ").strip() or default_model
+        console.print(f"[green]✓[/green] Found {len(models)} models!")
+
+        # Display models in a table if there are many
+        if len(models) > 15:
+            model = _select_from_list("Select model", models, default_model)
         else:
-            model = input("Model name: ").strip()
+            model_table = Table(show_header=False, box=None)
+            model_table.add_column("Number", style="cyan", width=4)
+            model_table.add_column("Model", style="white")
+
+            for i, m in enumerate(models[:15], 1):
+                marker = " [green]*[/green]" if m == default_model else ""
+                model_table.add_row(str(i), f"{m}{marker}")
+
+            console.print(model_table)
+
+            # Get model choice
+            choice_str = Prompt.ask("\n[bold]Select model number or type custom[/bold]", default="1")
+            if choice_str.isdigit() and 1 <= int(choice_str) <= len(models):
+                model = models[int(choice_str) - 1]
+            else:
+                model = choice_str
+    else:
+        if choice in ("1", "2", "3"):
+            console.print("[yellow]⚠[/yellow]  Could not fetch models (check API key or endpoint)")
+        if default_model:
+            model = Prompt.ask("[cyan]Model name[/cyan]", default=default_model)
+        else:
+            model = ""
             while not model:
-                print("  Model name is required.")
-                model = input("Model name: ").strip()
+                model = Prompt.ask("[cyan]Model name[/cyan] (required)")
+
+    console.print(f"[green]✓[/green] Model selected: [bold]{model}[/bold]")
 
     # Write config (using Docker-compatible URL)
     config_path = _get_config_path()
@@ -264,16 +300,21 @@ def run_init() -> None:
 
     config_path.chmod(0o600)
 
-    print("\n" + "=" * 50)
-    print("Configuration complete!")
-    print(f"  Provider: {name}")
-    print(f"  Model:    {model}")
-    print(f"  Saved to: {config_path}")
-    print("=" * 50)
-    print("\nYou're ready to go! Try:")
-    print("  kernagent analyze <binary>")
-    print("  kernagent chat <binary>")
-    print()
+    # Success message
+    console.print("\n" + "─" * 60)
+    console.print(Panel.fit(
+        f"[green]✓ Configuration Complete![/green]\n\n"
+        f"[cyan]Provider:[/cyan] {name}\n"
+        f"[cyan]Model:[/cyan]    {model}\n"
+        f"[cyan]Config:[/cyan]   {config_path}",
+        border_style="green",
+        padding=(1, 2)
+    ))
+    console.print("─" * 60)
+
+    console.print("\n[bold green]You're ready to go![/bold green] Try these commands:\n")
+    console.print("  [cyan]kernagent analyze[/cyan] [dim]<binary>[/dim]")
+    console.print("  [cyan]kernagent chat[/cyan] [dim]<binary>[/dim]\n")
 
 
 def run_analyze(
@@ -284,16 +325,38 @@ def run_analyze(
     full: bool,
 ) -> None:
     """One-click threat assessment."""
+    from rich.console import Console
+    from rich.rule import Rule
+    from datetime import datetime
+    import io
+    import contextlib
+
+    console = Console()
     snapshot_dir = _snapshot_dir_for(binary_path)
 
-    if not snapshot_dir.exists():
-        print("🔨 Building snapshot...", file=sys.stderr)
-        snapshot_dir = build_snapshot(binary_path, verbose=verbose)
+    # Suppress verbose output unless verbose flag is set
+    output_suppressor = contextlib.redirect_stdout(io.StringIO()) if not verbose else contextlib.nullcontext()
 
+    # Step 1: Snapshot
+    if not snapshot_dir.exists():
+        with console.status("[bold blue]Extracting binary artifacts via Ghidra...", spinner="dots"):
+            with output_suppressor:
+                snapshot_dir = build_snapshot(binary_path, verbose=verbose)
+        console.print("[green]✓[/green] Snapshot extracted")
+    else:
+        console.print(f"[dim]Using existing snapshot: {snapshot_dir.name}[/dim]")
+
+    # Step 2: Context
     context_level = "full" if full else "basic"
-    context_path = ensure_context(snapshot_dir, settings, level=context_level, verbose=verbose)
-    context_text = context_path.read_text(encoding="utf-8")
-    summary = ensure_oneshot_summary(snapshot_dir, verbose=verbose)
+    with console.status(f"[bold blue]Preparing {context_level} analysis context...", spinner="dots"):
+        with output_suppressor:
+            context_path = ensure_context(snapshot_dir, settings, level=context_level, verbose=verbose)
+            context_text = context_path.read_text(encoding="utf-8")
+            summary = ensure_oneshot_summary(snapshot_dir, verbose=verbose)
+    console.print(f"[green]✓[/green] Context prepared ({len(context_text):,} characters)")
+
+    # Step 3: Analysis
+    console.print(f"[bold blue]Analyzing {binary_path.name}...[/bold blue]")
 
     if json_output:
         print(json.dumps(summary, indent=2))
@@ -302,36 +365,83 @@ def run_analyze(
     llm = LLMClient(settings)
     payload = json.dumps(summary, indent=2)
 
-    # Stream the response with explicit unbuffered output for Docker compatibility
-    for chunk in llm.chat_stream(
-        verbose=verbose,
-        messages=[
-            {"role": "system", "content": ANALYZE_SYSTEM_PROMPT},
-            {
-                "role": "system",
-                "content": "Pre-analysis context for this binary (BINARY_CONTEXT.md):\n\n" + context_text,
-            },
-            {"role": "user", "content": payload},
-        ],
-        temperature=0,
-    ):
-        sys.stdout.write(chunk)
-        sys.stdout.flush()
-    sys.stdout.write("\n")  # Final newline
-    sys.stdout.flush()
-    print(f"Context written to: {context_path}")
+    # Stream the response and render as markdown
+    from rich.markdown import Markdown
+    from rich.live import Live
+    from rich.spinner import Spinner
+    from rich.columns import Columns
+
+    console.print(f"\n[bold cyan]Analysis for {binary_path.name}:[/bold cyan]\n")
+
+    accumulated_text = ""
+
+    # Use Live display for real-time markdown rendering
+    with Live(console=console, refresh_per_second=4) as live:
+        live.update(Spinner("dots", text="[dim]Generating analysis...[/dim]"))
+
+        for chunk in llm.chat_stream(
+            verbose=verbose,
+            messages=[
+                {"role": "system", "content": ANALYZE_SYSTEM_PROMPT},
+                {
+                    "role": "system",
+                    "content": "Pre-analysis context for this binary (BINARY_CONTEXT.md):\n\n" + context_text,
+                },
+                {"role": "user", "content": payload},
+            ],
+            temperature=0,
+        ):
+            accumulated_text += chunk
+            # Update live display with rendered markdown
+            live.update(Markdown(accumulated_text))
+
+    # Final markdown render
+    console.print(Markdown(accumulated_text))
+    console.print()
+
+    # Add finishing touches
+    console.print(Rule(style="dim"))
+    console.print(f"[dim]Analysis completed at {datetime.now().strftime('%H:%M:%S')}[/dim]")
+    console.print(f"[dim]Context saved to: {context_path}[/dim]\n")
 
 
 def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
     """Interactive RE session with REPL."""
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.prompt import Prompt
+    import io
+    import contextlib
+    from .events import (
+        ThinkingEvent,
+        ToolCallEvent,
+        ToolResultEvent,
+        MessageEvent,
+        ErrorEvent,
+        MaxIterationsEvent,
+    )
+
+    console = Console()
     snapshot_dir = _snapshot_dir_for(binary_path)
 
-    if not snapshot_dir.exists():
-        print("🔨 Building snapshot...", file=sys.stderr)
-        snapshot_dir = build_snapshot(binary_path, verbose=verbose)
+    # Suppress verbose output unless verbose flag is set
+    output_suppressor = contextlib.redirect_stdout(io.StringIO()) if not verbose else contextlib.nullcontext()
 
-    context_path = ensure_context(snapshot_dir, settings, level="basic", verbose=verbose)
-    context_text = context_path.read_text(encoding="utf-8")
+    # Step 1: Snapshot
+    if not snapshot_dir.exists():
+        with console.status("[bold blue]Extracting binary artifacts via Ghidra...", spinner="dots"):
+            with output_suppressor:
+                snapshot_dir = build_snapshot(binary_path, verbose=verbose)
+        console.print("[green]✓[/green] Snapshot extracted")
+    else:
+        console.print(f"[dim]Using existing snapshot: {snapshot_dir.name}[/dim]")
+
+    # Step 2: Context
+    with console.status("[bold blue]Preparing analysis context...", spinner="dots"):
+        with output_suppressor:
+            context_path = ensure_context(snapshot_dir, settings, level="basic", verbose=verbose)
+            context_text = context_path.read_text(encoding="utf-8")
+    console.print(f"[green]✓[/green] Context ready ({len(context_text):,} characters)")
 
     snapshot = SnapshotTools(snapshot_dir)
     tool_map = build_tool_map(snapshot)
@@ -350,35 +460,92 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
 
     agent = _make_agent()
 
-    print(f"\nkernagent chat session for {binary_path.name}")
-    print("Type 'exit', 'quit', or Ctrl+D to exit. 'clear' to reset.\n")
+    # Display welcome banner
+    console.print(Panel.fit(
+        f"[bold cyan]Chat session for {binary_path.name}[/bold cyan]\n\n"
+        f"[dim]Type 'exit', 'quit', or Ctrl+D to exit\n"
+        f"Type 'clear' to reset conversation[/dim]",
+        border_style="cyan"
+    ))
+    console.print()
 
     while True:
         try:
-            user_input = input("kernagent >> ").strip()
+            user_input = Prompt.ask("\n[bold cyan]>>[/bold cyan]").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nExiting.")
+            console.print("\n[dim]Exiting...[/dim]")
             break
 
         if not user_input:
             continue
         if user_input.lower() in ("exit", "quit"):
+            console.print("[dim]Goodbye![/dim]")
             break
         if user_input.lower() == "clear":
             agent = _make_agent()
-            print("Session cleared.\n")
+            console.print("[yellow]✓[/yellow] Session cleared\n")
             continue
 
         try:
-            answer = agent.run(user_input, verbose=verbose)
-            print(f"\n{answer}\n")
+            from rich.live import Live
+            from rich.spinner import Spinner
+
+            # Use Live context for smooth updates
+            with Live(console=console, refresh_per_second=10, transient=True) as live:
+                for event in agent.run_stream(user_input, verbose=verbose):
+                    if isinstance(event, ThinkingEvent):
+                        # Show spinner while thinking
+                        live.update(Spinner("dots", text=f"[dim]Thinking... (step {event.iteration}/{event.max_iterations})[/dim]"))
+
+                    elif isinstance(event, ToolCallEvent):
+                        # Show tool call immediately (not in live display)
+                        live.stop()
+                        # Format tool arguments for display
+                        args_str = ", ".join(f"{k}={v!r}" for k, v in list(event.arguments.items())[:2])
+                        if len(event.arguments) > 2:
+                            args_str += ", ..."
+                        console.print(f"[dim]  → {event.tool_name}({args_str})[/dim]")
+                        live.start()
+
+                    elif isinstance(event, ToolResultEvent):
+                        live.stop()
+                        if event.success:
+                            console.print("[dim]    [green]✓[/green] Done[/dim]")
+                        else:
+                            console.print(f"[dim]    [red]✗[/red] Error: {event.error}[/dim]")
+                        live.start()
+
+                    elif isinstance(event, MaxIterationsEvent):
+                        live.stop()
+                        console.print("[yellow]⚠[/yellow]  Max iterations reached, generating summary...")
+                        live.start()
+
+                    elif isinstance(event, MessageEvent):
+                        if event.is_final:
+                            # Stop the live display before showing final answer
+                            live.stop()
+                            # Display the final answer
+                            console.print("\n[bold magenta]Assistant:[/bold magenta]")
+                            console.print(event.content)
+                            console.print()
+
+                    elif isinstance(event, ErrorEvent):
+                        live.stop()
+                        console.print(f"\n[red]Error:[/red] {event.message}\n")
+
         except Exception as exc:
             logger.error("Agent error: %s", exc)
-            print(f"\nError: {exc}\n")
+            console.print(f"\n[red]Error:[/red] {exc}\n")
 
 
 def run_snapshot(binary_path: Path | None, list_mode: bool, force: bool, verbose: bool) -> None:
     """Snapshot management."""
+    from rich.console import Console
+    from rich.table import Table
+    from rich.panel import Panel
+
+    console = Console()
+
     if list_mode or binary_path is None:
         # List all .snapshot directories (current dir + subdirs)
         # Also check /data for Docker environments where host dir is mounted there
@@ -390,10 +557,16 @@ def run_snapshot(binary_path: Path | None, list_mode: bool, force: bool, verbose
         snapshots: set[Path] = set()
         for base in search_paths:
             snapshots |= set(base.glob("*.snapshot")) | set(base.glob("**/*.snapshot"))
+
         if not snapshots:
-            print("No snapshots found.")
+            console.print("[yellow]No snapshots found.[/yellow]")
             return
-        print("Snapshots:")
+
+        # Display snapshots in a table
+        table = Table(title="Available Snapshots", show_header=True, header_style="bold cyan")
+        table.add_column("Snapshot", style="green")
+        table.add_column("Path", style="dim")
+
         for s in sorted(snapshots):
             # Show relative path from cwd or /data
             try:
@@ -403,22 +576,34 @@ def run_snapshot(binary_path: Path | None, list_mode: bool, force: bool, verbose
                     rel = s.relative_to(data_path)
                 except ValueError:
                     rel = s
-            print(f"  {rel}")
+            table.add_row(s.name, str(rel.parent) if rel.parent != Path(".") else ".")
+
+        console.print(table)
         return
 
     snapshot_dir = _snapshot_dir_for(binary_path)
 
     if snapshot_dir.exists() and not force:
-        print(f"Snapshot exists: {snapshot_dir}")
-        print("Use --force to rebuild.")
+        console.print(Panel.fit(
+            f"[yellow]Snapshot already exists[/yellow]\n\n"
+            f"[dim]Path:[/dim] {snapshot_dir}\n\n"
+            f"[dim]Use[/dim] [cyan]--force[/cyan] [dim]to rebuild[/dim]",
+            border_style="yellow"
+        ))
         return
 
     if snapshot_dir.exists() and force:
+        console.print("[yellow]⚠[/yellow]  Removing existing snapshot...")
         shutil.rmtree(snapshot_dir)
 
-    print(f"🔨 Building snapshot for {binary_path.name}...")
-    result = build_snapshot(binary_path, verbose=verbose)
-    print(f"✓ Snapshot created: {result}")
+    with console.status(f"[bold blue]Building snapshot for {binary_path.name}...", spinner="dots"):
+        result = build_snapshot(binary_path, verbose=verbose)
+
+    console.print(Panel.fit(
+        f"[green]✓ Snapshot created successfully![/green]\n\n"
+        f"[dim]Path:[/dim] {result}",
+        border_style="green"
+    ))
 
 
 # ============================================================================
