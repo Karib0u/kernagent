@@ -371,7 +371,7 @@ def run_analyze(
     from rich.spinner import Spinner
     from rich.columns import Columns
 
-    console.print(f"\n[bold cyan]Analysis for {binary_path.name}:[/bold cyan]\n")
+    console.print(f"[bold cyan]Analysis for {binary_path.name}:[/bold cyan]")
 
     accumulated_text = ""
 
@@ -394,10 +394,6 @@ def run_analyze(
             accumulated_text += chunk
             # Update live display with rendered markdown
             live.update(Markdown(accumulated_text))
-
-    # Final markdown render
-    console.print(Markdown(accumulated_text))
-    console.print()
 
     # Add finishing touches
     console.print(Rule(style="dim"))
@@ -525,8 +521,9 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
                             # Stop the live display before showing final answer
                             live.stop()
                             # Display the final answer
+                            from rich.markdown import Markdown
                             console.print("\n[bold magenta]Assistant:[/bold magenta]")
-                            console.print(event.content)
+                            console.print(Markdown(event.content))
                             console.print()
 
                     elif isinstance(event, ErrorEvent):
