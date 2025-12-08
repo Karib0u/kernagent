@@ -7,6 +7,13 @@ on:
       - 'v*'  # Trigger on version tags (v1.0.0, v1.2.3, etc.)
   pull_request:
     branches: [ main, develop ]
+  workflow_dispatch:  # Allow manual trigger
+    inputs:
+      test_multiplatform:
+        description: 'Test multi-platform build (amd64 + arm64)'
+        required: false
+        default: false
+        type: boolean
 
 # Cancel previous runs on the same branch/PR to save resources
 concurrency:
@@ -100,13 +107,14 @@ jobs:
         with:
           context: .
           push: false
-          platforms: linux/amd64
+          platforms: ${{ (github.event_name == 'workflow_dispatch' && inputs.test_multiplatform) && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           tags: kernagent:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          load: true
+          load: ${{ !(github.event_name == 'workflow_dispatch' && inputs.test_multiplatform) }}  # Can't load multi-platform images
 
       - name: Create container for pytest run
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.test_multiplatform) }}
         run: |
           docker create --name "$TEST_CONTAINER_NAME" \
             --entrypoint "" \
@@ -114,16 +122,19 @@ jobs:
             python -m pytest /workspace/project/tests -v
 
       - name: Copy tests into container
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.test_multiplatform) }}
         run: docker cp tests "$TEST_CONTAINER_NAME":/workspace/project/
 
       - name: Run pytest inside Docker image
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.test_multiplatform) }}
         run: docker start -a "$TEST_CONTAINER_NAME"
 
       - name: Remove test container
-        if: always()
+        if: always() && !(github.event_name == 'workflow_dispatch' && inputs.test_multiplatform)
         run: docker rm -f "$TEST_CONTAINER_NAME"
 
       - name: Test CLI help command
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.test_multiplatform) }}
         run: |
           docker run --rm kernagent:test --help
 
