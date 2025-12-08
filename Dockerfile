@@ -110,25 +110,8 @@ WORKDIR /workspace/project
 COPY pyproject.toml uv.lock /workspace/project/
 COPY README.md /workspace/project/README.md
 
-# Create the kernagent package directory and copy Python sources
-RUN mkdir -p /workspace/project/kernagent
-COPY kernagent/__init__.py \
-     kernagent/__main__.py \
-     kernagent/agent.py \
-     kernagent/capa_runner.py \
-     kernagent/cli.py \
-     kernagent/cli_app.py \
-     kernagent/context.py \
-     kernagent/config.py \
-     kernagent/events.py \
-     kernagent/llm_client.py \
-     kernagent/log.py \
-     kernagent/prompts.py \
-     /workspace/project/kernagent/
-
-# Copy subdirectories
-COPY kernagent/oneshot /workspace/project/kernagent/oneshot
-COPY kernagent/snapshot /workspace/project/kernagent/snapshot
+# Copy the entire kernagent package so new modules are automatically included
+COPY kernagent /workspace/project/kernagent
 
 # Pin Python version to 3.12 (python-flirt doesn't have wheels for 3.14 yet)
 ENV UV_PYTHON=3.12
