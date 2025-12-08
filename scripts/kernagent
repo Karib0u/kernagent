@@ -120,6 +120,9 @@ run_container(){
       mount_dir="$abs_dir"
       local base_name
       base_name="$(basename "$candidate")"
+      if [[ "$VERBOSE" -eq 1 ]]; then
+        log "Detected binary: $candidate (mounted at /data/${base_name})"
+      fi
       args[$binary_idx]="/data/${base_name}"
     fi
   fi
