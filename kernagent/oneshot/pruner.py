@@ -981,7 +981,9 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
             string_kind_counts[kind] += 1
             # Only add to interesting_strings list up to MAX_STRINGS limit
             if len(interesting_strings) < MAX_STRINGS:
-                used_in_names = _dedup_preserve([ref.get("name", "") for ref in refs if ref.get("name")])
+                used_in_names = _dedup_preserve(
+                    [ref.get("name", "") for ref in refs if ref.get("name")]
+                )
                 interesting_strings.append(
                     {
                         "value": value,
@@ -1159,7 +1161,9 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
             refs, _ = _resolve_function_refs(entry.get("xrefs"), name_by_ea, ea_by_name)
             if not refs:
                 continue
-            used_in = _dedup_preserve([ref.get("name", "") for ref in refs if ref.get("name")])
+            used_in = _dedup_preserve(
+                [ref.get("name", "") for ref in refs if ref.get("name")]
+            )
             if not used_in:
                 continue
             possible_configs.append(
