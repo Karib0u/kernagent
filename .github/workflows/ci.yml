@@ -60,16 +60,26 @@ jobs:
           cd kernagent
           uv sync --all-groups
 
+      - name: Run ruff format check
+        run: |
+          cd kernagent
+          uv run ruff format --check .
+
+      - name: Run ruff linting
+        run: |
+          cd kernagent
+          uv run ruff check .
+
       - name: Check Python syntax
         run: |
           cd kernagent
           uv run python -m py_compile *.py */**.py
 
-  # Build Docker image for PRs and develop branch (test only, no push)
+  # Build Docker image for all branches and PRs (test only, no push)
   build-test:
     name: Build Docker Image (Test)
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/develop'
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
     needs: [test, lint]
     env:
       TEST_CONTAINER_NAME: kernagent-test-${{ github.run_id }}
