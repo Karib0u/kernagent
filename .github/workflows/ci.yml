@@ -2,11 +2,20 @@ name: CI
 
 on:
   push:
-    branches: [ '**' ]  # Run on all branches
+    branches: [ main, develop ]  # Run on main branches only
     tags:
       - 'v*'  # Trigger on version tags (v1.0.0, v1.2.3, etc.)
   pull_request:
     branches: [ main, develop ]
+
+# Cancel previous runs on the same branch/PR to save resources
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Security: Default to read-only, escalate where needed
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -70,11 +79,6 @@ jobs:
           cd kernagent
           uv run ruff check .
 
-      - name: Check Python syntax
-        run: |
-          cd kernagent
-          uv run python -m py_compile *.py */**.py
-
   # Build Docker image for all branches and PRs (test only, no push)
   build-test:
     name: Build Docker Image (Test)
@@ -129,6 +133,9 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [test, lint]
+    permissions:
+      contents: write  # Needed to create GitHub Release
+      packages: write  # Needed to push to GHCR
 
     steps:
       - name: Checkout code
@@ -169,48 +176,9 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: false
 
-      - name: Generate release notes
-        id: release_notes
-        run: |
-          # Extract version from tag
-          VERSION=${GITHUB_REF#refs/tags/}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-          # Generate release notes from commits since last tag
-          PREV_TAG=$(git describe --abbrev=0 --tags ${GITHUB_REF}^ 2>/dev/null || echo "")
-          if [ -n "$PREV_TAG" ]; then
-            echo "## Changes since $PREV_TAG" > release_notes.md
-            git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" >> release_notes.md
-          else
-            echo "## Initial Release" > release_notes.md
-            echo "First release of kernagent" >> release_notes.md
-          fi
-
-          # Add installation instructions
-          cat >> release_notes.md << 'EOF'
-
-          ## Installation
-
-          **Quick install (Linux/macOS/WSL2):**
-          ```bash
-          bash <(curl -fsSL https://raw.githubusercontent.com/Karib0u/kernagent/$VERSION/install.sh)
-          ```
-
-          **Docker:**
-          ```bash
-          docker pull ghcr.io/karib0u/kernagent:$VERSION
-          ```
-
-          **See the [README](https://github.com/Karib0u/kernagent#readme) for full documentation.**
-          EOF
-
-          # Replace $VERSION placeholder
-          sed -i "s/\$VERSION/$VERSION/g" release_notes.md
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          body_path: release_notes.md
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -223,6 +191,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
     needs: [test, lint]
+    permissions:
+      contents: read
+      packages: write  # Needed to push to GHCR
 
     steps:
       - name: Checkout code
