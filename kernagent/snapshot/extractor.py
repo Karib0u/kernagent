@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List
-from contextlib import contextmanager
 
 from rich.console import Console
 from rich.progress import (
@@ -53,6 +56,12 @@ except Exception as exc:  # pragma: no cover - handled at runtime
     _PYGHIDRA_IMPORT_ERROR = exc
 
 
+class _ThreadLocalDecompiler(threading.local):
+    """Thread-local storage for DecompInterface instances."""
+    def __init__(self):
+        self.decompiler = None
+
+
 class BinaryArchiveExtractor:
     """Extract comprehensive binary information for AI analysis"""
 
@@ -88,6 +97,204 @@ class BinaryArchiveExtractor:
         else:
             with console.status(f"[cyan]{message}[/]") as status:
                 yield status
+
+    def _configure_decompiler(self, decompiler):
+        """Configure decompiler for optimal performance."""
+        opts = DecompileOptions()
+
+        # Memory limits (slight increase from default 50MB)
+        opts.setMaxPayloadMBytes(64)
+
+        decompiler.setOptions(opts)
+        return decompiler
+
+    def _get_decompile_timeout(self, function) -> int:
+        """
+        Calculate appropriate decompilation timeout based on function size.
+
+        Small functions rarely need more than a few seconds.
+        Large functions may need the full timeout.
+        """
+        try:
+            body = function.getBody()
+            size = sum(
+                r.getMaxAddress().subtract(r.getMinAddress()) + 1
+                for r in body
+            )
+
+            if size < 100:       # Tiny function (<100 bytes)
+                return 5
+            elif size < 500:     # Small function
+                return 10
+            elif size < 2000:    # Medium function
+                return 20
+            elif size < 10000:   # Large function
+                return 45
+            else:                # Very large function
+                return 60
+
+        except Exception:
+            return 30  # Default fallback
+
+    def _get_thread_decompiler(self, program):
+        """Get or create a thread-local DecompInterface."""
+        if not hasattr(self, '_thread_local'):
+            self._thread_local = _ThreadLocalDecompiler()
+
+        if self._thread_local.decompiler is None:
+            self._thread_local.decompiler = DecompInterface()
+            self._thread_local.decompiler.openProgram(program)
+            self._configure_decompiler(self._thread_local.decompiler)
+
+        return self._thread_local.decompiler
+
+    def _decompile_single_function(self, func, program, timeout=None):
+        """
+        Decompile a single function (designed for parallel execution).
+
+        Args:
+            func: Ghidra Function object
+            program: Ghidra Program object
+            timeout: Decompilation timeout in seconds (None = adaptive)
+
+        Returns:
+            Tuple of (entry_point_str, decompiled_code_or_None)
+        """
+        try:
+            decompiler = self._get_thread_decompiler(program)
+            monitor = ConsoleTaskMonitor()
+
+            # Use adaptive timeout if not specified
+            if timeout is None:
+                timeout = self._get_decompile_timeout(func)
+
+            result = decompiler.decompileFunction(func, timeout, monitor)
+
+            if result and result.decompileCompleted():
+                decomp_func = result.getDecompiledFunction()
+                if decomp_func:
+                    return (str(func.getEntryPoint()), decomp_func.getC())
+
+            return (str(func.getEntryPoint()), None)
+
+        except Exception as e:
+            logger.warning("Decompilation failed for %s: %s", func.getName(), e)
+            return (str(func.getEntryPoint()), None)
+
+    def _cleanup_thread_decompilers(self):
+        """Dispose of any thread-local decompiler instances."""
+        if hasattr(self, '_thread_local') and self._thread_local.decompiler:
+            try:
+                self._thread_local.decompiler.dispose()
+            except:
+                pass
+            self._thread_local.decompiler = None
+
+    def _build_xref_maps(self, program, monitor):
+        """
+        Build caller/callee maps for the entire program.
+
+        Returns:
+            Tuple of (callers_map, callees_map)
+            callers_map: {ea: [list of caller eas]}
+            callees_map: {ea: [list of {ea, name, type} dicts]}
+        """
+        self.log("Building cross-reference maps...")
+
+        callers = {}   # ea -> list of caller eas
+        callees = {}   # ea -> list of callee dicts
+
+        func_mgr = program.getFunctionManager()
+        ref_mgr = program.getReferenceManager()
+
+        for func in func_mgr.getFunctions(True):
+            ea = str(func.getEntryPoint())
+            callers[ea] = []
+            callees[ea] = []
+
+            # Get callers (references TO this function's entry point)
+            for ref in ref_mgr.getReferencesTo(func.getEntryPoint()):
+                from_addr = ref.getFromAddress()
+                caller = func_mgr.getFunctionContaining(from_addr)
+                if caller:
+                    caller_ea = str(caller.getEntryPoint())
+                    if caller_ea not in callers[ea]:
+                        callers[ea].append(caller_ea)
+
+            # Get callees (call/jump refs FROM this function's body)
+            body = func.getBody()
+            seen_callees = set()
+
+            for addr in body.getAddresses(True):
+                for ref in ref_mgr.getReferencesFrom(addr):
+                    ref_type = ref.getReferenceType()
+                    if ref_type.isCall() or ref_type.isJump():
+                        to_addr = ref.getToAddress()
+                        callee = func_mgr.getFunctionAt(to_addr)
+                        if callee:
+                            callee_ea = str(to_addr)
+                            if callee_ea not in seen_callees:
+                                seen_callees.add(callee_ea)
+                                callees[ea].append({
+                                    "ea": callee_ea,
+                                    "name": callee.getName(),
+                                    "type": str(ref_type)
+                                })
+
+        return callers, callees
+
+    def _run_selective_analysis(self, program, monitor):
+        """
+        Run only essential analyzers for decompilation.
+
+        Essential analyzers (in recommended order):
+        - Disassembly-related: Find code, create functions
+        - Reference analysis: Track calls and data refs
+        - Decompiler prep: Parameter identification
+
+        Skipped analyzers (slow, non-essential):
+        - DWARF, PDB (debug info - very slow if present)
+        - Demangler (slow for C++ heavy binaries)
+        - ASCII Strings (we extract strings separately)
+        - Embedded Media, GCC/Windows exception handlers
+        """
+        from ghidra.app.plugin.core.analysis import AutoAnalysisManager
+        from ghidra.program.util import GhidraProgramUtilities
+
+        mgr = AutoAnalysisManager.getAnalysisManager(program)
+
+        # Essential analyzers for quality decompilation
+        essential = {
+            "Disassembly",
+            "Function Start Search",
+            "Function Start Search After Code",
+            "Function Start Search After Data",
+            "Subroutine References",
+            "Reference",
+            "Entry Point",
+            "External Entry References",
+            "Shared Return Calls",
+            "Stack",
+            "Decompiler Parameter ID",
+            "Non-Returning Functions - Discovered",
+            "Non-Returning Functions - Known",
+            "Call Convention Identification",
+        }
+
+        # Disable all analyzers first, then enable only essential ones
+        for analyzer in mgr.getAnalyzers():
+            name = analyzer.getName()
+            mgr.setAnalyzerEnabled(name, name in essential)
+            self.log(f"Analyzer '{name}': {'enabled' if name in essential else 'disabled'}")
+
+        # Mark as analyzed and run
+        GhidraProgramUtilities.setAnalyzedFlag(program, True)
+        mgr.startAnalysis(monitor)
+
+        # Wait for analysis to complete
+        import time
+        while mgr.isAnalyzing():
+            time.sleep(0.1)
 
     def sanitize_filename(self, func_name: str, address: str, max_length: int = 200) -> str:
         """
@@ -221,7 +428,12 @@ class BinaryArchiveExtractor:
         }
 
     def get_xrefs_to_function(self, function, program) -> List[str]:
-        """Get all cross-references TO this function (callers)"""
+        """Get cached cross-references TO this function (callers)"""
+        ea = str(function.getEntryPoint())
+        if hasattr(self, 'callers_map') and ea in self.callers_map:
+            return self.callers_map[ea]
+
+        # Fallback to original implementation if maps not built
         xrefs_in = []
         entry_point = function.getEntryPoint()
 
@@ -239,7 +451,12 @@ class BinaryArchiveExtractor:
         return list(set(xrefs_in))  # Remove duplicates
 
     def get_xrefs_from_function(self, function, program) -> List[Dict[str, str]]:
-        """Get all cross-references FROM this function (callees)"""
+        """Get cached cross-references FROM this function (callees)"""
+        ea = str(function.getEntryPoint())
+        if hasattr(self, 'callees_map') and ea in self.callees_map:
+            return self.callees_map[ea]
+
+        # Fallback to original implementation if maps not built
         xrefs_out = []
 
         body = function.getBody()
@@ -272,10 +489,12 @@ class BinaryArchiveExtractor:
         basic_blocks = []
 
         try:
-            from ghidra.program.model.block import BasicBlockModel
-
-            # Create a BasicBlockModel for the program
-            bbm = BasicBlockModel(program)
+            # Use cached BasicBlockModel if available
+            if hasattr(self, 'bbm') and self.bbm:
+                bbm = self.bbm
+            else:
+                from ghidra.program.model.block import BasicBlockModel
+                bbm = BasicBlockModel(program)
 
             # Get function body address set
             func_body = function.getBody()
@@ -407,6 +626,60 @@ class BinaryArchiveExtractor:
         else:
             func_data["decomp_path"] = None
             func_data["decompiled_code"] = None
+
+        return func_data
+
+    def extract_function_data_no_decomp(self, function, program, monitor) -> Dict[str, Any]:
+        """Extract function information without decompilation."""
+        entry_point = function.getEntryPoint()
+
+        func_data = {
+            "ea": str(entry_point),
+            "name": function.getName(),
+            "ranges": [
+                [str(addr_range.getMinAddress()), str(addr_range.getMaxAddress())]
+                for addr_range in function.getBody()
+            ],
+            "xrefs_in": self.get_xrefs_to_function(function, program),
+            "xrefs_out": self.get_xrefs_from_function(function, program),
+        }
+
+        signature = function.getSignature()
+        if signature:
+            func_data["prototype"] = str(signature.getPrototypeString())
+
+        func_data["metrics"] = self.extract_function_metrics(function, program, monitor)
+
+        # Extract instructions
+        instructions = []
+        listing = program.getListing()
+        body = function.getBody()
+
+        addr_iter = body.getAddresses(True)
+        for addr in addr_iter:
+            instruction = listing.getInstructionAt(addr)
+            if instruction:
+                instr_info = self.extract_instruction_info(instruction, program)
+                instructions.append(instr_info)
+
+        func_data["insn"] = instructions
+
+        # Function bytes
+        try:
+            all_bytes = []
+            for addr_range in function.getBody():
+                start = addr_range.getMinAddress()
+                end = addr_range.getMaxAddress()
+                length = end.subtract(start) + 1
+                for i in range(length):
+                    byte = program.getMemory().getByte(start.add(i))
+                    all_bytes.append(byte & 0xFF)
+            func_data["bytes_concat"] = "".join(f"{b:02x}" for b in all_bytes)
+        except Exception:
+            func_data["bytes_concat"] = ""
+
+        func_data["bb"] = self.get_basic_blocks(function, program, monitor)
+        func_data["comments"] = self.extract_comments(function, program)
 
         return func_data
 
@@ -569,9 +842,13 @@ class BinaryArchiveExtractor:
     def calculate_cyclomatic_complexity(self, function, program, monitor) -> int:
         """Calculate cyclomatic complexity for a function"""
         try:
-            from ghidra.program.model.block import BasicBlockModel
+            # Use cached BasicBlockModel if available
+            if hasattr(self, 'bbm') and self.bbm:
+                bbm = self.bbm
+            else:
+                from ghidra.program.model.block import BasicBlockModel
+                bbm = BasicBlockModel(program)
 
-            bbm = BasicBlockModel(program)
             func_body = function.getBody()
 
             # Count basic blocks in this function
@@ -648,13 +925,18 @@ class BinaryArchiveExtractor:
                 function, program, monitor
             )
 
-            # Count incoming and outgoing calls
-            metrics["callers_count"] = len(
-                self.get_xrefs_to_function(function, program)
-            )
-            metrics["callees_count"] = len(
-                self.get_xrefs_from_function(function, program)
-            )
+            # Count incoming and outgoing calls (use cached maps if available)
+            ea = str(function.getEntryPoint())
+            if hasattr(self, 'callers_map'):
+                metrics["callers_count"] = len(self.callers_map.get(ea, []))
+                metrics["callees_count"] = len(self.callees_map.get(ea, []))
+            else:
+                metrics["callers_count"] = len(
+                    self.get_xrefs_to_function(function, program)
+                )
+                metrics["callees_count"] = len(
+                    self.get_xrefs_from_function(function, program)
+                )
 
         except Exception as e:
             logger.warning(
@@ -838,8 +1120,20 @@ class BinaryArchiveExtractor:
                 if not self.verbose:
                     console.print("[green]✓[/] Program analyzed and loaded")
 
+                # Build xref maps once
+                with self.status("Building cross-reference maps..."):
+                    self.callers_map, self.callees_map = self._build_xref_maps(program, monitor)
+                if not self.verbose:
+                    total_refs = sum(len(v) for v in self.callers_map.values())
+                    console.print(f"[green]✓[/] Built xref maps ([bold]{total_refs}[/bold] references)")
+
+                # Cache BasicBlockModel
+                from ghidra.program.model.block import BasicBlockModel
+                self.bbm = BasicBlockModel(program)
+
                 self.decompiler = DecompInterface()
                 self.decompiler.openProgram(program)
+                self._configure_decompiler(self.decompiler)
 
                 # Phase 2: Extract metadata
                 with self.status("Extracting metadata..."):
@@ -878,12 +1172,16 @@ class BinaryArchiveExtractor:
                 if not self.verbose:
                     console.print(f"[green]✓[/] Extracted [bold]{len(equates)}[/bold] equates")
 
-                # Phase 6: Process functions (the slow part)
+                # Phase 6: Process functions with parallel decompilation
                 func_manager = program.getFunctionManager()
                 functions = list(func_manager.getFunctions(True))
 
-                functions_data = []
-                decomp_count = 0
+                # Determine optimal thread count
+                num_workers = min(8, max(4, os.cpu_count() or 4))
+                self.log(f"Using {num_workers} threads for decompilation")
+
+                # Phase 6a: Parallel decompilation
+                decompiled_code = {}  # ea -> code mapping
 
                 if not self.verbose:
                     progress = Progress(
@@ -897,31 +1195,96 @@ class BinaryArchiveExtractor:
                     )
                     with progress:
                         task_id = progress.add_task(
-                            f"[cyan]Decompiling {len(functions)} functions...",
+                            f"[cyan]Decompiling {len(functions)} functions ({num_workers} threads)...",
                             total=len(functions),
                         )
-                        for func in functions:
-                            func_data = self.extract_function_data(func, program, monitor)
 
-                            if func_data.get("decompiled_code"):
-                                decomp_path = decomp_dir / Path(func_data["decomp_path"]).name
+                        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                            # Submit all decompilation tasks (with adaptive timeout)
+                            futures = {
+                                executor.submit(
+                                    self._decompile_single_function, func, program
+                                ): func for func in functions
+                            }
+
+                            # Collect results as they complete
+                            for future in as_completed(futures):
+                                ea, code = future.result()
+                                if code:
+                                    decompiled_code[ea] = code
+                                progress.update(task_id, advance=1)
+                else:
+                    # Verbose mode - still parallel but with logging
+                    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                        futures = {
+                            executor.submit(
+                                self._decompile_single_function, func, program
+                            ): func for func in functions
+                        }
+
+                        completed = 0
+                        for future in as_completed(futures):
+                            ea, code = future.result()
+                            if code:
+                                decompiled_code[ea] = code
+                            completed += 1
+                            if completed % 50 == 0:
+                                self.log(f"Decompiled {completed}/{len(functions)} functions")
+
+                decomp_count = len(decompiled_code)
+                self.log(f"Decompilation complete: {decomp_count}/{len(functions)} succeeded")
+
+                # Phase 6b: Extract function data (sequential, but fast without decompilation)
+                functions_data = []
+
+                if not self.verbose:
+                    progress = Progress(
+                        TextColumn("[progress.description]{task.description}"),
+                        BarColumn(),
+                        TaskProgressColumn(),
+                        TimeElapsedColumn(),
+                        TimeRemainingColumn(),
+                        transient=True,
+                        refresh_per_second=4,
+                    )
+                    with progress:
+                        task_id = progress.add_task(
+                            f"[cyan]Extracting function metadata...",
+                            total=len(functions),
+                        )
+
+                        for func in functions:
+                            ea = str(func.getEntryPoint())
+                            func_data = self.extract_function_data_no_decomp(func, program, monitor)
+
+                            # Add decompilation if available
+                            if ea in decompiled_code:
+                                safe_filename = self.sanitize_filename(func.getName(), ea)
+                                func_data["decomp_path"] = f"decomp/{safe_filename}"
+
+                                # Write decompiled code to file
+                                decomp_path = decomp_dir / safe_filename
                                 with open(decomp_path, "w", encoding="utf-8") as f:
-                                    f.write(func_data["decompiled_code"])
-                                decomp_count += 1
-                                del func_data["decompiled_code"]
+                                    f.write(decompiled_code[ea])
+                            else:
+                                func_data["decomp_path"] = None
 
                             functions_data.append(func_data)
                             progress.update(task_id, advance=1)
                 else:
                     for i, func in enumerate(functions, 1):
-                        func_data = self.extract_function_data(func, program, monitor)
+                        ea = str(func.getEntryPoint())
+                        func_data = self.extract_function_data_no_decomp(func, program, monitor)
 
-                        if func_data.get("decompiled_code"):
-                            decomp_path = decomp_dir / Path(func_data["decomp_path"]).name
+                        if ea in decompiled_code:
+                            safe_filename = self.sanitize_filename(func.getName(), ea)
+                            func_data["decomp_path"] = f"decomp/{safe_filename}"
+
+                            decomp_path = decomp_dir / safe_filename
                             with open(decomp_path, "w", encoding="utf-8") as f:
-                                f.write(func_data["decompiled_code"])
-                            decomp_count += 1
-                            del func_data["decompiled_code"]
+                                f.write(decompiled_code[ea])
+                        else:
+                            func_data["decomp_path"] = None
 
                         functions_data.append(func_data)
 
@@ -1000,6 +1363,7 @@ class BinaryArchiveExtractor:
         finally:
             if self.decompiler:
                 self.decompiler.dispose()
+            self._cleanup_thread_decompilers()
 
         # Phase 11: Build CAPA summary (outside Ghidra context)
         if metadata:
