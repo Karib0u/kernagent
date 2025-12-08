@@ -9,7 +9,7 @@ from pathlib import Path
 try:
     from dotenv import load_dotenv
 except ImportError:  # pragma: no cover - optional dependency
-    load_dotenv = None
+    load_dotenv = None  # type: ignore[assignment]
 
 
 @dataclass

@@ -702,7 +702,7 @@ def _resolve_function_refs(
             resolved_name = name_by_ea.get(ea, ea)
         if not ea and resolved_name and resolved_name in ea_by_name:
             ea = ea_by_name[resolved_name]
-        refs.append({"name": resolved_name or ea, "ea": ea})
+        refs.append({"name": str(resolved_name or ea or ""), "ea": str(ea or "")})
         if ea:
             eas.append(ea)
     return refs, eas
@@ -912,7 +912,7 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
         }
         functions.append(record)
         if record["ea"]:
-            name_by_ea[record["ea"]] = record["name"]
+            name_by_ea[str(record["ea"])] = str(record["name"])
 
     if not functions:
         raise OneshotPruningError("functions.jsonl is empty – cannot build summary.")
@@ -935,7 +935,7 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
     }
 
     section_summary, suspicious_sections = _analyze_sections(
-        sections, file_info["format"]
+        sections, str(file_info["format"] or "unknown")
     )
     suspicious_section_names = {
         sec["name"].lower() for sec in suspicious_sections if sec.get("name")
@@ -981,7 +981,7 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
             string_kind_counts[kind] += 1
             # Only add to interesting_strings list up to MAX_STRINGS limit
             if len(interesting_strings) < MAX_STRINGS:
-                used_in_names = _dedup_preserve([ref.get("name") for ref in refs])
+                used_in_names = _dedup_preserve([ref.get("name", "") for ref in refs if ref.get("name")])
                 interesting_strings.append(
                     {
                         "value": value,
@@ -1159,7 +1159,7 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
             refs, _ = _resolve_function_refs(entry.get("xrefs"), name_by_ea, ea_by_name)
             if not refs:
                 continue
-            used_in = _dedup_preserve(ref.get("name") for ref in refs)
+            used_in = _dedup_preserve([ref.get("name", "") for ref in refs if ref.get("name")])
             if not used_in:
                 continue
             possible_configs.append(
@@ -1196,7 +1196,7 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
             imports_by_capability,
             section_summary,
             string_kind_counts,
-            file_info.get("size") or 0,
+            int(file_info.get("size") or 0),
             key_functions_output,
         ),
         "notes": {

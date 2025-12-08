@@ -259,15 +259,15 @@ class SnapshotTools:
                     if not line.strip():
                         continue
                     func = json.loads(line)
-                    stats["total"] += 1
+                    stats["total"] += 1  # type: ignore[operator]
 
                     if func.get("decomp_path"):
-                        stats["with_decomp"] += 1
+                        stats["with_decomp"] += 1  # type: ignore[operator]
 
                     metrics = func.get("metrics", {})
                     complexity = metrics.get("cyclomatic_complexity", 0)
                     if complexity > 20:
-                        stats["high_complexity"].append(
+                        stats["high_complexity"].append(  # type: ignore[union-attr]
                             {
                                 "name": func["name"],
                                 "ea": func["ea"],
@@ -277,14 +277,14 @@ class SnapshotTools:
 
                     size = metrics.get("size_bytes", 0)
                     if size > 1000:
-                        stats["large_functions"].append(
+                        stats["large_functions"].append(  # type: ignore[union-attr]
                             {"name": func["name"], "ea": func["ea"], "size": size}
                         )
 
-            stats["high_complexity"] = sorted(
+            stats["high_complexity"] = sorted(  # type: ignore[assignment]
                 stats["high_complexity"], key=lambda x: x["complexity"], reverse=True
             )[:10]
-            stats["large_functions"] = sorted(
+            stats["large_functions"] = sorted(  # type: ignore[assignment]
                 stats["large_functions"], key=lambda x: x["size"], reverse=True
             )[:10]
 
@@ -823,7 +823,7 @@ class SnapshotTools:
 
                     if start_addr is not None:
                         ea_int = self._ea_to_int(entry_ea)
-                        if ea_int is None or not (start_addr <= ea_int <= end_addr):
+                        if ea_int is None or not (start_addr <= ea_int <= end_addr):  # type: ignore[operator]
                             continue
 
                     if (

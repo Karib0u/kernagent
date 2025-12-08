@@ -37,22 +37,22 @@ try:  # pragma: no cover - requires Ghidra environment
     import pyghidra
 
     pyghidra.start()
-    from ghidra.app.decompiler import DecompInterface, DecompileOptions
-    from ghidra.program.model.symbol import RefType
-    from ghidra.program.util import DefinedDataIterator, DefinedStringIterator
-    from ghidra.util.task import ConsoleTaskMonitor
-    from java.util import ArrayList
+    from ghidra.app.decompiler import DecompInterface, DecompileOptions  # type: ignore[import-untyped]
+    from ghidra.program.model.symbol import RefType  # type: ignore[import-untyped]
+    from ghidra.program.util import DefinedDataIterator, DefinedStringIterator  # type: ignore[import-untyped]
+    from ghidra.util.task import ConsoleTaskMonitor  # type: ignore[import-untyped]
+    from java.util import ArrayList  # type: ignore[import-untyped]
 
     _PYGHIDRA_IMPORT_ERROR: Exception | None = None
 except Exception as exc:  # pragma: no cover - handled at runtime
-    pyghidra = None
-    ConsoleTaskMonitor = None
-    DecompInterface = None
-    DecompileOptions = None
-    RefType = None
-    DefinedDataIterator = None
-    DefinedStringIterator = None
-    ArrayList = None
+    pyghidra = None  # type: ignore[assignment]
+    ConsoleTaskMonitor = None  # type: ignore[assignment]
+    DecompInterface = None  # type: ignore[assignment]
+    DecompileOptions = None  # type: ignore[assignment]
+    RefType = None  # type: ignore[assignment]
+    DefinedDataIterator = None  # type: ignore[assignment]
+    DefinedStringIterator = None  # type: ignore[assignment]
+    ArrayList = None  # type: ignore[assignment]
     _PYGHIDRA_IMPORT_ERROR = exc
 
 
@@ -105,7 +105,7 @@ class BinaryArchiveExtractor:
 
     def _configure_decompiler(self, decompiler):
         """Configure decompiler for optimal performance."""
-        opts = DecompileOptions()
+        opts = DecompileOptions()  # type: ignore[misc]
 
         # Memory limits (slight increase from default 50MB)
         opts.setMaxPayloadMBytes(64)
@@ -141,13 +141,13 @@ class BinaryArchiveExtractor:
     def _init_thread_worker(self, program):
         """Ensure thread-local decompiler, monitor, and block model are set."""
         if self._thread_env.decompiler is None:
-            self._thread_env.decompiler = DecompInterface()
-            self._thread_env.decompiler.openProgram(program)
+            self._thread_env.decompiler = DecompInterface()  # type: ignore[misc]
+            self._thread_env.decompiler.openProgram(program)  # type: ignore[union-attr]
             self._configure_decompiler(self._thread_env.decompiler)
         if self._thread_env.monitor is None:
-            self._thread_env.monitor = ConsoleTaskMonitor()
+            self._thread_env.monitor = ConsoleTaskMonitor()  # type: ignore[misc]
         if self._thread_env.bbm is None:
-            from ghidra.program.model.block import BasicBlockModel
+            from ghidra.program.model.block import BasicBlockModel  # type: ignore[import-untyped]
 
             self._thread_env.bbm = BasicBlockModel(program)
         return self._thread_env
@@ -165,8 +165,8 @@ class BinaryArchiveExtractor:
             Tuple of (entry_point_str, decompiled_code_or_None)
         """
         try:
-            decompiler = self._get_thread_decompiler(program)
-            monitor = ConsoleTaskMonitor()
+            decompiler = self._get_thread_decompiler(program)  # type: ignore[attr-defined]
+            monitor = ConsoleTaskMonitor()  # type: ignore[misc]
 
             # Use adaptive timeout if not specified
             if timeout is None:
@@ -266,7 +266,7 @@ class BinaryArchiveExtractor:
         - ASCII Strings (we extract strings separately)
         - Embedded Media, GCC/Windows exception handlers
         """
-        from ghidra.app.plugin.core.analysis import AutoAnalysisManager
+        from ghidra.app.plugin.core.analysis import AutoAnalysisManager  # type: ignore[import-untyped]
 
         mgr = AutoAnalysisManager.getAnalysisManager(program)
 
@@ -519,7 +519,7 @@ class BinaryArchiveExtractor:
             if hasattr(self, "bbm") and self.bbm:
                 bbm = self.bbm
             else:
-                from ghidra.program.model.block import BasicBlockModel
+                from ghidra.program.model.block import BasicBlockModel  # type: ignore[import-untyped]
 
                 bbm = BasicBlockModel(program)
 
@@ -527,7 +527,7 @@ class BinaryArchiveExtractor:
             func_body = function.getBody()
 
             # Get all blocks in the program
-            block_iter = bbm.getCodeBlocks(monitor)
+            block_iter = bbm.getCodeBlocks(monitor)  # type: ignore[union-attr]
 
             # Filter blocks that belong to this function
             while block_iter.hasNext():
@@ -754,7 +754,7 @@ class BinaryArchiveExtractor:
         strings_data = []
 
         try:
-            from ghidra.program.util import DefinedStringIterator
+            from ghidra.program.util import DefinedStringIterator  # type: ignore[import-untyped]
 
             # Use DefinedStringIterator to find strings
             string_iter = DefinedStringIterator.forProgram(program)
@@ -910,14 +910,14 @@ class BinaryArchiveExtractor:
             if hasattr(self, "bbm") and self.bbm:
                 bbm = self.bbm
             else:
-                from ghidra.program.model.block import BasicBlockModel
+                from ghidra.program.model.block import BasicBlockModel  # type: ignore[import-untyped]
 
                 bbm = BasicBlockModel(program)
 
             func_body = function.getBody()
 
             # Count basic blocks in this function
-            block_iter = bbm.getCodeBlocks(monitor)
+            block_iter = bbm.getCodeBlocks(monitor)  # type: ignore[union-attr]
             block_count = 0
             edge_count = 0
 
@@ -972,7 +972,7 @@ class BinaryArchiveExtractor:
             metrics["instruction_count"] = instr_count
 
             # Count basic blocks
-            from ghidra.program.model.block import BasicBlockModel
+            from ghidra.program.model.block import BasicBlockModel  # type: ignore[import-untyped]
 
             bbm = BasicBlockModel(program)
             block_iter = bbm.getCodeBlocks(monitor)
@@ -1165,7 +1165,7 @@ class BinaryArchiveExtractor:
             with pyghidra.open_program(self.binary_path, analyze=True) as flat_api:
                 with self.status("Loading program..."):
                     program = flat_api.getCurrentProgram()
-                    monitor = ConsoleTaskMonitor()
+                    monitor = ConsoleTaskMonitor()  # type: ignore[misc]
                     self.log(f"Program loaded: {program.getName()}")
                 if not self.verbose:
                     console.print("[green]✓[/] Program analyzed and loaded")

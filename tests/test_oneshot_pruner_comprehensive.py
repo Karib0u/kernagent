@@ -1,5 +1,6 @@
 """Comprehensive tests for oneshot pruner logic."""
 
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -120,7 +121,7 @@ class TestStringClassification:
 
     def test_classify_none_or_empty(self):
         """None or empty strings should return None."""
-        assert _classify_string(None) is None
+        assert _classify_string(None) is None  # type: ignore[arg-type]
         assert _classify_string("") is None
         assert _classify_string("   ") is None
 
@@ -421,7 +422,7 @@ class TestSuspicionSignals:
         signals = _build_suspicion_signals(
             imports_by_cap={"network": ["connect"]},
             sections_info={},
-            string_kind_counts={"url": 0},
+            string_kind_counts=Counter({"url": 0}),
             file_size=100000,
             key_functions=[],
         )
@@ -433,7 +434,7 @@ class TestSuspicionSignals:
         signals = _build_suspicion_signals(
             imports_by_cap={},
             sections_info={},
-            string_kind_counts={"url": 5},
+            string_kind_counts=Counter({"url": 5}),
             file_size=100000,
             key_functions=[],
         )
@@ -445,7 +446,7 @@ class TestSuspicionSignals:
         signals = _build_suspicion_signals(
             imports_by_cap={"filesystem": ["CreateFile"]},
             sections_info={},
-            string_kind_counts={},
+            string_kind_counts=Counter(),
             file_size=100000,
             key_functions=[],
         )
@@ -457,7 +458,7 @@ class TestSuspicionSignals:
         signals = _build_suspicion_signals(
             imports_by_cap={"process": ["CreateProcess"]},
             sections_info={},
-            string_kind_counts={},
+            string_kind_counts=Counter(),
             file_size=100000,
             key_functions=[],
         )
@@ -469,7 +470,7 @@ class TestSuspicionSignals:
         signals = _build_suspicion_signals(
             imports_by_cap={"memory_injection": ["VirtualAlloc"]},
             sections_info={"has_rwx": False},
-            string_kind_counts={},
+            string_kind_counts=Counter(),
             file_size=100000,
             key_functions=[],
         )
@@ -481,7 +482,7 @@ class TestSuspicionSignals:
         signals = _build_suspicion_signals(
             imports_by_cap={"persistence": ["RegSetValue"]},
             sections_info={},
-            string_kind_counts={},
+            string_kind_counts=Counter(),
             file_size=100000,
             key_functions=[],
         )
@@ -493,7 +494,7 @@ class TestSuspicionSignals:
         signals = _build_suspicion_signals(
             imports_by_cap={},
             sections_info={},
-            string_kind_counts={},
+            string_kind_counts=Counter(),
             file_size=50000,  # Small
             key_functions=[{"cyclomatic_complexity": 35, "size_bytes": 100}],  # Complex
         )
@@ -505,7 +506,7 @@ class TestSuspicionSignals:
         signals = _build_suspicion_signals(
             imports_by_cap={},
             sections_info={},
-            string_kind_counts={"command": 3},
+            string_kind_counts=Counter({"command": 3}),
             file_size=100000,
             key_functions=[],
         )

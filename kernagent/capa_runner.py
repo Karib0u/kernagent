@@ -278,7 +278,7 @@ def _analyze_with_capa(binary_path: Path, rules_path: Optional[Path]):
         capabilities,
     )
 
-    meta.analysis.layout = capa.loader.compute_layout(
+    meta.analysis.layout = capa.loader.compute_layout(  # type: ignore[assignment]
         rules, extractor, capabilities.matches
     )
 

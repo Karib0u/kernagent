@@ -47,7 +47,7 @@ def test_agent_runs_tool_loop():
         return {"received": kwargs}
 
     agent = ReverseEngineeringAgent(
-        llm=llm,
+        llm=llm,  # type: ignore[arg-type]
         tools_spec=[
             {
                 "type": "function",
@@ -72,7 +72,7 @@ def test_agent_preserves_conversation_history():
     llm = FakeLLM()
 
     agent = ReverseEngineeringAgent(
-        llm=llm,
+        llm=llm,  # type: ignore[arg-type]
         tools_spec=[],
         tool_map={},
     )
@@ -108,7 +108,7 @@ def test_agent_excludes_tool_calls_from_history():
         return "tool result"
 
     agent = ReverseEngineeringAgent(
-        llm=llm,
+        llm=llm,  # type: ignore[arg-type]
         tools_spec=[
             {
                 "type": "function",
