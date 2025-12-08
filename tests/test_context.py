@@ -99,7 +99,7 @@ class TestWriteContextFile:
 
         content = output.read_text()
         assert content.startswith(CONTEXT_HEADER)
-        assert f"level: basic" in content
+        assert "level: basic" in content
         assert f"version: {CONTEXT_VERSION}" in content
         assert "# Test Content" in content
         assert content.endswith("\n")
@@ -123,14 +123,18 @@ class TestDetectContextLevel:
     def test_detects_basic_level(self, tmp_path):
         """Should detect basic level from header."""
         ctx_file = tmp_path / "context.md"
-        ctx_file.write_text(f"{CONTEXT_HEADER}\nlevel: basic\nversion: {CONTEXT_VERSION}\n\nContent")
+        ctx_file.write_text(
+            f"{CONTEXT_HEADER}\nlevel: basic\nversion: {CONTEXT_VERSION}\n\nContent"
+        )
 
         assert detect_context_level(ctx_file) == "basic"
 
     def test_detects_full_level(self, tmp_path):
         """Should detect full level from header."""
         ctx_file = tmp_path / "context.md"
-        ctx_file.write_text(f"{CONTEXT_HEADER}\nlevel: full\nversion: {CONTEXT_VERSION}\n\nContent")
+        ctx_file.write_text(
+            f"{CONTEXT_HEADER}\nlevel: full\nversion: {CONTEXT_VERSION}\n\nContent"
+        )
 
         assert detect_context_level(ctx_file) == "full"
 
@@ -379,14 +383,18 @@ class TestBuildBasicContext:
 
     def test_produces_markdown_from_summary(self, mock_settings, minimal_summary):
         """Should generate markdown context from oneshot summary."""
-        mock_markdown = "# Overview\nBasic analysis complete.\n\n# Capabilities\nNetwork: confirmed"
+        mock_markdown = (
+            "# Overview\nBasic analysis complete.\n\n# Capabilities\nNetwork: confirmed"
+        )
 
         with mock.patch("kernagent.context.LLMClient") as mock_llm_class:
             mock_llm = mock.Mock()
             mock_llm.chat.return_value = DummyResponse(mock_markdown)
             mock_llm_class.return_value = mock_llm
 
-            result = build_basic_context_markdown(minimal_summary, mock_settings, verbose=False)
+            result = build_basic_context_markdown(
+                minimal_summary, mock_settings, verbose=False
+            )
 
             assert "# Overview" in result
             assert isinstance(result, str)
@@ -417,7 +425,9 @@ class TestBuildFullContext:
             ]
             mock_llm_class.return_value = mock_llm
 
-            result = build_full_context_markdown(minimal_summary, mock_settings, verbose=True)
+            result = build_full_context_markdown(
+                minimal_summary, mock_settings, verbose=True
+            )
 
             assert "# Full Analysis" in result
             # Should have called LLM 5 times (4 agents + 1 synthesis)
@@ -440,7 +450,9 @@ class TestEnsureContext:
         ctx_file = snapshot_dir / "BINARY_CONTEXT.md"
         write_context_file(ctx_file, "# Existing full context", level="full")
 
-        result = ensure_context(snapshot_dir, mock_settings, level="basic", verbose=False)
+        result = ensure_context(
+            snapshot_dir, mock_settings, level="basic", verbose=False
+        )
 
         assert result == ctx_file
         # Should not have modified the file
@@ -454,14 +466,18 @@ class TestEnsureContext:
         ctx_file = snapshot_dir / "BINARY_CONTEXT.md"
         write_context_file(ctx_file, "# Existing basic context", level="basic")
 
-        result = ensure_context(snapshot_dir, mock_settings, level="basic", verbose=False)
+        result = ensure_context(
+            snapshot_dir, mock_settings, level="basic", verbose=False
+        )
 
         assert result == ctx_file
         assert "# Existing basic context" in ctx_file.read_text()
 
     @mock.patch("kernagent.context.build_basic_context_markdown")
     @mock.patch("kernagent.context.ensure_oneshot_summary")
-    def test_builds_basic_when_missing(self, mock_ensure, mock_build, tmp_path, mock_settings, minimal_summary):
+    def test_builds_basic_when_missing(
+        self, mock_ensure, mock_build, tmp_path, mock_settings, minimal_summary
+    ):
         """Should build basic context if none exists."""
         snapshot_dir = tmp_path / "test.snapshot"
         snapshot_dir.mkdir()
@@ -469,7 +485,9 @@ class TestEnsureContext:
         mock_ensure.return_value = minimal_summary
         mock_build.return_value = "# New basic context"
 
-        result = ensure_context(snapshot_dir, mock_settings, level="basic", verbose=False)
+        result = ensure_context(
+            snapshot_dir, mock_settings, level="basic", verbose=False
+        )
 
         assert result == snapshot_dir / "BINARY_CONTEXT.md"
         assert detect_context_level(result) == "basic"
@@ -477,7 +495,9 @@ class TestEnsureContext:
 
     @mock.patch("kernagent.context.build_full_context_markdown")
     @mock.patch("kernagent.context.ensure_oneshot_summary")
-    def test_upgrades_basic_to_full_when_requested(self, mock_ensure, mock_build, tmp_path, mock_settings, minimal_summary):
+    def test_upgrades_basic_to_full_when_requested(
+        self, mock_ensure, mock_build, tmp_path, mock_settings, minimal_summary
+    ):
         """Should rebuild from basic to full when full is requested."""
         snapshot_dir = tmp_path / "test.snapshot"
         snapshot_dir.mkdir()

@@ -268,7 +268,11 @@ class SnapshotTools:
                     complexity = metrics.get("cyclomatic_complexity", 0)
                     if complexity > 20:
                         stats["high_complexity"].append(
-                            {"name": func["name"], "ea": func["ea"], "complexity": complexity}
+                            {
+                                "name": func["name"],
+                                "ea": func["ea"],
+                                "complexity": complexity,
+                            }
                         )
 
                     size = metrics.get("size_bytes", 0)
@@ -372,11 +376,17 @@ class SnapshotTools:
                         continue
                     func = json.loads(line)
 
-                    if name_pattern and name_pattern.lower() not in func["name"].lower():
+                    if (
+                        name_pattern
+                        and name_pattern.lower() not in func["name"].lower()
+                    ):
                         continue
 
                     metrics = func.get("metrics", {})
-                    if min_complexity and metrics.get("cyclomatic_complexity", 0) < min_complexity:
+                    if (
+                        min_complexity
+                        and metrics.get("cyclomatic_complexity", 0) < min_complexity
+                    ):
                         continue
 
                     if min_size and metrics.get("size_bytes", 0) < min_size:
@@ -412,7 +422,11 @@ class SnapshotTools:
                     if len(results) >= limit:
                         break
 
-            return {"results": results, "count": len(results), "limited": len(results) >= limit}
+            return {
+                "results": results,
+                "count": len(results),
+                "limited": len(results) >= limit,
+            }
         except Exception as exc:
             return {"error": str(exc)}
 
@@ -485,17 +499,28 @@ class SnapshotTools:
         for entry in search_list:
             if library and library.lower() not in entry.get("library", "").lower():
                 continue
-            if name_pattern and name_pattern.lower() not in entry.get("name", "").lower():
+            if (
+                name_pattern
+                and name_pattern.lower() not in entry.get("name", "").lower()
+            ):
                 continue
 
             results.append(entry)
             if len(results) >= limit:
                 break
 
-        return {"results": results, "count": len(results), "limited": len(results) >= limit}
+        return {
+            "results": results,
+            "count": len(results),
+            "limited": len(results) >= limit,
+        }
 
     def trace_calls(
-        self, start: str, direction: str = "down", max_depth: int = 3, max_nodes: int = 200
+        self,
+        start: str,
+        direction: str = "down",
+        max_depth: int = 3,
+        max_nodes: int = 200,
     ) -> Dict[str, Any]:
         if max_nodes < 1:
             return {"error": "max_nodes must be at least 1"}
@@ -548,7 +573,9 @@ class SnapshotTools:
 
             if direction == "down":
                 child_key = "calls"
-                child_targets = [xref.get("ea") for xref in func.get("xrefs_out", [])[:10]]
+                child_targets = [
+                    xref.get("ea") for xref in func.get("xrefs_out", [])[:10]
+                ]
             else:
                 child_key = "called_by"
                 child_targets = func.get("xrefs_in", [])[:10]
@@ -579,7 +606,10 @@ class SnapshotTools:
         return result
 
     def search_equates(
-        self, name_pattern: Optional[str] = None, value: Optional[str] = None, limit: int = 50
+        self,
+        name_pattern: Optional[str] = None,
+        value: Optional[str] = None,
+        limit: int = 50,
     ) -> Dict[str, Any]:
         equates = self.read_json("equates.json")
         if "error" in equates:
@@ -596,7 +626,10 @@ class SnapshotTools:
                 target_value = value
 
         for entry in equates:
-            if name_pattern and name_pattern.lower() not in entry.get("name", "").lower():
+            if (
+                name_pattern
+                and name_pattern.lower() not in entry.get("name", "").lower()
+            ):
                 continue
 
             if target_value is not None:
@@ -723,7 +756,11 @@ class SnapshotTools:
                     if len(results) >= limit:
                         break
 
-            return {"results": results, "count": len(results), "limited": len(results) >= limit}
+            return {
+                "results": results,
+                "count": len(results),
+                "limited": len(results) >= limit,
+            }
         except Exception as exc:
             return {"error": str(exc)}
 
@@ -853,7 +890,9 @@ class SnapshotTools:
         seen: set[Tuple[str, Optional[str], Optional[str]]] = set()
         sequence = 0
 
-        def add_candidate(priority: int, kind: str, name: Optional[str], ea: Optional[str]):
+        def add_candidate(
+            priority: int, kind: str, name: Optional[str], ea: Optional[str]
+        ):
             nonlocal sequence
             key = (kind, name, ea)
             if key in seen:
@@ -863,13 +902,23 @@ class SnapshotTools:
                 (
                     priority,
                     sequence,
-                    {"kind": kind, "name": name, "ea": self._normalize_ea(ea) if ea else ea},
+                    {
+                        "kind": kind,
+                        "name": name,
+                        "ea": self._normalize_ea(ea) if ea else ea,
+                    },
                 )
             )
             sequence += 1
 
-        def match_priority(name: Optional[str], ea: Optional[str], base_priority: int) -> Optional[int]:
-            if normalized_query_ea and ea and self._normalize_ea(ea) == normalized_query_ea:
+        def match_priority(
+            name: Optional[str], ea: Optional[str], base_priority: int
+        ) -> Optional[int]:
+            if (
+                normalized_query_ea
+                and ea
+                and self._normalize_ea(ea) == normalized_query_ea
+            ):
                 return base_priority
             if name and name.lower() == query_lower:
                 return base_priority
@@ -953,7 +1002,9 @@ class SnapshotTools:
 
         candidates.sort(key=lambda item: (item[0], item[1]))
         best_priority = candidates[0][0]
-        best_candidates = [item[2] for item in candidates if item[0] == best_priority][:50]
+        best_candidates = [item[2] for item in candidates if item[0] == best_priority][
+            :50
+        ]
         ambiguous = len(best_candidates) > 1
 
         return {"ambiguous": ambiguous, "candidates": best_candidates}
@@ -981,7 +1032,10 @@ class SnapshotTools:
         resolution = self.resolve_symbol(target)
         candidates = resolution.get("candidates", [])
         if not candidates:
-            return {"error": resolution.get("error") or f"Could not resolve target '{target}'"}
+            return {
+                "error": resolution.get("error")
+                or f"Could not resolve target '{target}'"
+            }
 
         selected = candidates[0]
         target_ea = self._normalize_ea(selected.get("ea"))
@@ -989,7 +1043,11 @@ class SnapshotTools:
         target_kind = selected.get("kind")
 
         result = {
-            "resolved_target": {"name": target_name, "ea": target_ea, "kind": target_kind},
+            "resolved_target": {
+                "name": target_name,
+                "ea": target_ea,
+                "kind": target_kind,
+            },
             "xrefs": [],
             "offset": offset,
             "limit": limit,
@@ -1009,7 +1067,9 @@ class SnapshotTools:
         seen: set[Tuple[Any, ...]] = set()
         func_lookup = self._function_lookup()
         target_label = target_name or target_ea
-        target_name_lower = target_name.lower() if isinstance(target_name, str) else None
+        target_name_lower = (
+            target_name.lower() if isinstance(target_name, str) else None
+        )
 
         def add_xref(entry: Dict[str, Any]):
             key = (
@@ -1047,7 +1107,9 @@ class SnapshotTools:
                             to_ea = self._normalize_ea(edge.get("to"))
                             call_type = self._call_type_label(edge.get("type"))
 
-                            if need_to and matches_target(edge.get("to_name"), to_ea or edge.get("to")):
+                            if need_to and matches_target(
+                                edge.get("to_name"), to_ea or edge.get("to")
+                            ):
                                 add_xref(
                                     {
                                         "direction": "to",
@@ -1061,13 +1123,17 @@ class SnapshotTools:
                                     }
                                 )
 
-                            if need_from and matches_target(edge.get("from_name"), from_ea or edge.get("from")):
+                            if need_from and matches_target(
+                                edge.get("from_name"), from_ea or edge.get("from")
+                            ):
                                 add_xref(
                                     {
                                         "direction": "from",
                                         "kind": "code",
                                         "type": call_type,
-                                        "from_ea": target_ea or from_ea or edge.get("from"),
+                                        "from_ea": target_ea
+                                        or from_ea
+                                        or edge.get("from"),
                                         "from_function": target_name,
                                         "to_ea": to_ea or edge.get("to"),
                                         "to_name": edge.get("to_name"),
@@ -1089,7 +1155,9 @@ class SnapshotTools:
                                 "kind": "code",
                                 "type": "call",
                                 "from_ea": caller_ea or caller,
-                                "from_function": func_lookup.get(caller_ea or "", caller_ea),
+                                "from_function": func_lookup.get(
+                                    caller_ea or "", caller_ea
+                                ),
                                 "to_ea": target_ea,
                                 "to_name": target_name,
                             }
@@ -1111,7 +1179,10 @@ class SnapshotTools:
 
         # Target function referencing data/strings
         if target_kind == "function" and need_from and need_data:
-            for filename, entry_kind in (("strings.jsonl", "string"), ("data.jsonl", "data")):
+            for filename, entry_kind in (
+                ("strings.jsonl", "string"),
+                ("data.jsonl", "data"),
+            ):
                 path = self.root / filename
                 if not path.exists():
                     continue
@@ -1124,14 +1195,20 @@ class SnapshotTools:
                             xrefs_list = entry.get("xrefs") or []
                             if not isinstance(xrefs_list, list):
                                 continue
-                            entry_ea = self._normalize_ea(entry.get("ea")) or entry.get("ea")
+                            entry_ea = self._normalize_ea(entry.get("ea")) or entry.get(
+                                "ea"
+                            )
                             entry_label = entry.get("name")
                             if not entry_label:
                                 if entry_kind == "string":
                                     value = entry.get("value")
-                                    entry_label = value[:80] if isinstance(value, str) else value
+                                    entry_label = (
+                                        value[:80] if isinstance(value, str) else value
+                                    )
                                 else:
-                                    entry_label = entry_ea and f"DATA_{entry_ea}" or "data_item"
+                                    entry_label = (
+                                        entry_ea and f"DATA_{entry_ea}" or "data_item"
+                                    )
 
                             for xref in xrefs_list:
                                 from_ea = self._normalize_ea(xref.get("from"))
@@ -1139,13 +1216,19 @@ class SnapshotTools:
                                 match = False
                                 if target_ea and from_ea == target_ea:
                                     match = True
-                                elif target_name_lower and function_name and function_name.lower() == target_name_lower:
+                                elif (
+                                    target_name_lower
+                                    and function_name
+                                    and function_name.lower() == target_name_lower
+                                ):
                                     match = True
                                 if not match:
                                     continue
 
                                 entry_type = xref.get("type") or (
-                                    "string_ref" if entry_kind == "string" else "data_ref"
+                                    "string_ref"
+                                    if entry_kind == "string"
+                                    else "data_ref"
                                 )
                                 add_xref(
                                     {

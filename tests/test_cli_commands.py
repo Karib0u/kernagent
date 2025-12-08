@@ -10,14 +10,12 @@ from kernagent.cli import (
     build_parser,
     ensure_snapshot,
     run_analyze,
-    run_chat,
     run_snapshot,
     _snapshot_dir_for,
     _get_config_path,
     _fetch_models,
 )
 from kernagent.config import Settings
-from kernagent.snapshot import SnapshotError
 
 
 class DummyMessage:
@@ -129,19 +127,25 @@ class TestArgumentParsing:
     def test_global_model_override(self):
         """Test --model global argument."""
         parser = build_parser()
-        args = parser.parse_args(["--model", "custom-model", "analyze", "/path/to/binary"])
+        args = parser.parse_args(
+            ["--model", "custom-model", "analyze", "/path/to/binary"]
+        )
         assert args.model == "custom-model"
 
     def test_global_base_url_override(self):
         """Test --base-url global argument."""
         parser = build_parser()
-        args = parser.parse_args(["--base-url", "http://custom-url", "analyze", "/path/to/binary"])
+        args = parser.parse_args(
+            ["--base-url", "http://custom-url", "analyze", "/path/to/binary"]
+        )
         assert args.base_url == "http://custom-url"
 
     def test_global_api_key_override(self):
         """Test --api-key global argument."""
         parser = build_parser()
-        args = parser.parse_args(["--api-key", "custom-key", "analyze", "/path/to/binary"])
+        args = parser.parse_args(
+            ["--api-key", "custom-key", "analyze", "/path/to/binary"]
+        )
         assert args.api_key == "custom-key"
 
     def test_verbose_flag(self):
@@ -230,14 +234,22 @@ class TestAnalyzeCommand:
         # Create a mock binary path that maps to the fixture
         binary_path = fixture_archive.parent / "bifrose"
 
-        with mock.patch("kernagent.cli._snapshot_dir_for", return_value=fixture_archive):
+        with mock.patch(
+            "kernagent.cli._snapshot_dir_for", return_value=fixture_archive
+        ):
             with mock.patch("kernagent.cli.ensure_context") as mock_ensure_context:
                 # Mock context path
                 mock_ctx_path = fixture_archive / "BINARY_CONTEXT.md"
                 mock_ctx_path.write_text("# Mock context")
                 mock_ensure_context.return_value = mock_ctx_path
 
-                run_analyze(binary_path, mock_settings, verbose=False, json_output=True, full=False)
+                run_analyze(
+                    binary_path,
+                    mock_settings,
+                    verbose=False,
+                    json_output=True,
+                    full=False,
+                )
 
         captured = capsys.readouterr()
         # Extract JSON from output (may have console status messages before it)
@@ -252,7 +264,9 @@ class TestAnalyzeCommand:
         """Analyze without --json should stream LLM response."""
         binary_path = fixture_archive.parent / "bifrose"
 
-        with mock.patch("kernagent.cli._snapshot_dir_for", return_value=fixture_archive):
+        with mock.patch(
+            "kernagent.cli._snapshot_dir_for", return_value=fixture_archive
+        ):
             with mock.patch("kernagent.cli.ensure_context") as mock_ensure_context:
                 with mock.patch("kernagent.cli.LLMClient") as mock_llm_class:
                     # Mock context
@@ -262,10 +276,18 @@ class TestAnalyzeCommand:
 
                     # Mock LLM
                     mock_llm = mock.Mock()
-                    mock_llm.chat_stream.return_value = iter(["Threat ", "assessment ", "complete."])
+                    mock_llm.chat_stream.return_value = iter(
+                        ["Threat ", "assessment ", "complete."]
+                    )
                     mock_llm_class.return_value = mock_llm
 
-                    run_analyze(binary_path, mock_settings, verbose=False, json_output=False, full=False)
+                    run_analyze(
+                        binary_path,
+                        mock_settings,
+                        verbose=False,
+                        json_output=False,
+                        full=False,
+                    )
 
                     captured = capsys.readouterr()
                     assert "Threat assessment complete." in captured.out
@@ -356,7 +378,9 @@ class TestSettingsOverride:
     def test_base_url_override_applied(self):
         """Test that --base-url overrides settings.base_url."""
         parser = build_parser()
-        args = parser.parse_args(["--base-url", "http://custom", "analyze", "/test/binary"])
+        args = parser.parse_args(
+            ["--base-url", "http://custom", "analyze", "/test/binary"]
+        )
 
         settings = Settings()
         if args.base_url:

@@ -153,12 +153,12 @@ TOOLS = [
                 "properties": {
                     "filepath": {
                         "type": "string",
-                        "description": "Relative path, e.g. 'meta.json', 'sections.json'."
+                        "description": "Relative path, e.g. 'meta.json', 'sections.json'.",
                     }
                 },
-                "required": ["filepath"]
-            }
-        }
+                "required": ["filepath"],
+            },
+        },
     },
     {
         "type": "function",
@@ -168,11 +168,8 @@ TOOLS = [
                 "Return the filtered CAPA summary (capa_summary.json) including rule hits, "
                 "namespaces, ATT&CK/MBC mappings, and representative locations."
             ),
-            "parameters": {
-                "type": "object",
-                "properties": {}
-            }
-        }
+            "parameters": {"type": "object", "properties": {}},
+        },
     },
     {
         "type": "function",
@@ -182,11 +179,8 @@ TOOLS = [
                 "Return the persisted BINARY_CONTEXT.md content (if present) including line count. "
                 "Use to recall the pre-analysis context built from the snapshot."
             ),
-            "parameters": {
-                "type": "object",
-                "properties": {}
-            }
-        }
+            "parameters": {"type": "object", "properties": {}},
+        },
     },
     {
         "type": "function",
@@ -202,15 +196,15 @@ TOOLS = [
                 "properties": {
                     "directory": {
                         "type": "string",
-                        "description": "Directory relative to bundle root (default: '.')."
+                        "description": "Directory relative to bundle root (default: '.').",
                     },
                     "pattern": {
                         "type": "string",
-                        "description": "Glob-style pattern, e.g. '*.json', 'decomp/*.c'."
-                    }
-                }
-            }
-        }
+                        "description": "Glob-style pattern, e.g. '*.json', 'decomp/*.c'.",
+                    },
+                },
+            },
+        },
     },
     {
         "type": "function",
@@ -221,11 +215,8 @@ TOOLS = [
                 "distribution of sizes/complexities, list of large/complex outliers. "
                 "Use for quick high-level overview."
             ),
-            "parameters": {
-                "type": "object",
-                "properties": {}
-            }
-        }
+            "parameters": {"type": "object", "properties": {}},
+        },
     },
     {
         "type": "function",
@@ -240,36 +231,36 @@ TOOLS = [
                 "properties": {
                     "name_pattern": {
                         "type": "string",
-                        "description": "Case-insensitive substring match in function name."
+                        "description": "Case-insensitive substring match in function name.",
                     },
                     "min_complexity": {
                         "type": "integer",
-                        "description": "Minimum cyclomatic complexity."
+                        "description": "Minimum cyclomatic complexity.",
                     },
                     "min_size": {
                         "type": "integer",
-                        "description": "Minimum size in bytes."
+                        "description": "Minimum size in bytes.",
                     },
                     "has_decomp": {
                         "type": "boolean",
-                        "description": "If true, only functions with available decompilation."
+                        "description": "If true, only functions with available decompilation.",
                     },
                     "callers_of": {
                         "type": "string",
-                        "description": "Return functions that call this function (name or EA)."
+                        "description": "Return functions that call this function (name or EA).",
                     },
                     "callees_of": {
                         "type": "string",
-                        "description": "Return functions called by this function (name or EA)."
+                        "description": "Return functions called by this function (name or EA).",
                     },
                     "limit": {
                         "type": "integer",
                         "default": 50,
-                        "description": "Maximum number of results."
-                    }
-                }
-            }
-        }
+                        "description": "Maximum number of results.",
+                    },
+                },
+            },
+        },
     },
     {
         "type": "function",
@@ -284,12 +275,12 @@ TOOLS = [
                 "properties": {
                     "identifier": {
                         "type": "string",
-                        "description": "Function name or EA (hex without 0x)."
+                        "description": "Function name or EA (hex without 0x).",
                     }
                 },
-                "required": ["identifier"]
-            }
-        }
+                "required": ["identifier"],
+            },
+        },
     },
     {
         "type": "function",
@@ -304,12 +295,12 @@ TOOLS = [
                 "properties": {
                     "decomp_path": {
                         "type": "string",
-                        "description": "e.g. 'decomp/140001000_FUN_140001000.c'."
+                        "description": "e.g. 'decomp/140001000_FUN_140001000.c'.",
                     }
                 },
-                "required": ["decomp_path"]
-            }
-        }
+                "required": ["decomp_path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -324,22 +315,22 @@ TOOLS = [
                 "properties": {
                     "pattern": {
                         "type": "string",
-                        "description": "Substring or regex-like pattern."
+                        "description": "Substring or regex-like pattern.",
                     },
                     "case_sensitive": {
                         "type": "boolean",
                         "default": False,
-                        "description": "If true, match is case-sensitive."
+                        "description": "If true, match is case-sensitive.",
                     },
                     "limit": {
                         "type": "integer",
                         "default": 50,
-                        "description": "Maximum number of results."
-                    }
+                        "description": "Maximum number of results.",
+                    },
                 },
-                "required": ["pattern"]
-            }
-        }
+                "required": ["pattern"],
+            },
+        },
     },
     {
         "type": "function",
@@ -354,25 +345,25 @@ TOOLS = [
                 "properties": {
                     "name_pattern": {
                         "type": "string",
-                        "description": "Match on API/function name."
+                        "description": "Match on API/function name.",
                     },
                     "library": {
                         "type": "string",
-                        "description": "Filter by library, e.g. 'kernel32.dll'."
+                        "description": "Filter by library, e.g. 'kernel32.dll'.",
                     },
                     "import_type": {
                         "type": "string",
                         "enum": ["import", "export"],
-                        "description": "Restrict to imports or exports."
+                        "description": "Restrict to imports or exports.",
                     },
                     "limit": {
                         "type": "integer",
                         "default": 100,
-                        "description": "Maximum number of results."
-                    }
-                }
-            }
-        }
+                        "description": "Maximum number of results.",
+                    },
+                },
+            },
+        },
     },
     {
         "type": "function",
@@ -388,26 +379,23 @@ TOOLS = [
                 "properties": {
                     "start": {
                         "type": "string",
-                        "description": "Function name or EA (hex without 0x)."
+                        "description": "Function name or EA (hex without 0x).",
                     },
                     "direction": {
                         "type": "string",
                         "enum": ["down", "up"],
-                        "default": "down"
+                        "default": "down",
                     },
-                    "max_depth": {
-                        "type": "integer",
-                        "default": 3
-                    },
+                    "max_depth": {"type": "integer", "default": 3},
                     "max_nodes": {
                         "type": "integer",
                         "default": 200,
-                        "description": "Safety cap on total nodes in the returned tree."
-                    }
+                        "description": "Safety cap on total nodes in the returned tree.",
+                    },
                 },
-                "required": ["start"]
-            }
-        }
+                "required": ["start"],
+            },
+        },
     },
     {
         "type": "function",
@@ -422,19 +410,16 @@ TOOLS = [
                 "properties": {
                     "name_pattern": {
                         "type": "string",
-                        "description": "Match equate name."
+                        "description": "Match equate name.",
                     },
                     "value": {
                         "type": "string",
-                        "description": "Numeric value (decimal or hex string) to match."
+                        "description": "Numeric value (decimal or hex string) to match.",
                     },
-                    "limit": {
-                        "type": "integer",
-                        "default": 50
-                    }
-                }
-            }
-        }
+                    "limit": {"type": "integer", "default": 50},
+                },
+            },
+        },
     },
     {
         "type": "function",
@@ -449,11 +434,11 @@ TOOLS = [
                 "properties": {
                     "address": {
                         "type": "string",
-                        "description": "EA (hex without 0x). Optional."
+                        "description": "EA (hex without 0x). Optional.",
                     }
-                }
-            }
-        }
+                },
+            },
+        },
     },
     {
         "type": "function",
@@ -468,20 +453,17 @@ TOOLS = [
                 "properties": {
                     "mnemonic": {
                         "type": "string",
-                        "description": "Instruction mnemonic, e.g. 'xor', 'syscall', 'cpuid'."
+                        "description": "Instruction mnemonic, e.g. 'xor', 'syscall', 'cpuid'.",
                     },
                     "operand_pattern": {
                         "type": "string",
-                        "description": "Optional operand substring/pattern."
+                        "description": "Optional operand substring/pattern.",
                     },
-                    "limit": {
-                        "type": "integer",
-                        "default": 20
-                    }
+                    "limit": {"type": "integer", "default": 20},
                 },
-                "required": ["mnemonic"]
-            }
-        }
+                "required": ["mnemonic"],
+            },
+        },
     },
     {
         "type": "function",
@@ -496,44 +478,44 @@ TOOLS = [
                 "properties": {
                     "name_pattern": {
                         "type": "string",
-                        "description": "Match on data name."
+                        "description": "Match on data name.",
                     },
                     "type_pattern": {
                         "type": "string",
-                        "description": "Match on type string."
+                        "description": "Match on type string.",
                     },
                     "address_range": {
                         "type": "array",
                         "items": {"type": "string"},
                         "minItems": 2,
                         "maxItems": 2,
-                        "description": "Filter to items whose ea is within [start, end] (hex strings without 0x)."
+                        "description": "Filter to items whose ea is within [start, end] (hex strings without 0x).",
                     },
                     "min_length": {
                         "type": "integer",
-                        "description": "Minimum length/size in bytes."
+                        "description": "Minimum length/size in bytes.",
                     },
                     "max_length": {
                         "type": "integer",
-                        "description": "Maximum length/size in bytes."
+                        "description": "Maximum length/size in bytes.",
                     },
                     "has_value": {
                         "type": "boolean",
-                        "description": "If true, only return items that include a non-empty value field."
+                        "description": "If true, only return items that include a non-empty value field.",
                     },
                     "limit": {
                         "type": "integer",
                         "default": 50,
-                        "description": "Maximum number of results to return."
+                        "description": "Maximum number of results to return.",
                     },
                     "offset": {
                         "type": "integer",
                         "default": 0,
-                        "description": "Skip this many matching results (pagination)."
-                    }
-                }
-            }
-        }
+                        "description": "Skip this many matching results (pagination).",
+                    },
+                },
+            },
+        },
     },
     {
         "type": "function",
@@ -548,12 +530,12 @@ TOOLS = [
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Function/data/import/export/string identifier. Accepts names or hex addresses (with or without 0x)."
+                        "description": "Function/data/import/export/string identifier. Accepts names or hex addresses (with or without 0x).",
                     }
                 },
-                "required": ["query"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
@@ -568,34 +550,34 @@ TOOLS = [
                 "properties": {
                     "target": {
                         "type": "string",
-                        "description": "Symbol name or address (hex, with or without 0x)."
+                        "description": "Symbol name or address (hex, with or without 0x).",
                     },
                     "direction": {
                         "type": "string",
                         "enum": ["to", "from", "both"],
                         "default": "both",
-                        "description": "'to' = who references target; 'from' = what target references."
+                        "description": "'to' = who references target; 'from' = what target references.",
                     },
                     "xref_type": {
                         "type": "string",
                         "enum": ["code", "data", "any"],
                         "default": "any",
-                        "description": "Filter for code xrefs (calls/jumps), data xrefs (reads/writes/string refs), or any."
+                        "description": "Filter for code xrefs (calls/jumps), data xrefs (reads/writes/string refs), or any.",
                     },
                     "limit": {
                         "type": "integer",
                         "default": 100,
-                        "description": "Maximum number of xrefs to return."
+                        "description": "Maximum number of xrefs to return.",
                     },
                     "offset": {
                         "type": "integer",
                         "default": 0,
-                        "description": "Number of initial xrefs to skip (pagination)."
-                    }
+                        "description": "Number of initial xrefs to skip (pagination).",
+                    },
                 },
-                "required": ["target"]
-            }
-        }
+                "required": ["target"],
+            },
+        },
     },
     {
         "type": "function",
@@ -610,33 +592,33 @@ TOOLS = [
                 "properties": {
                     "pattern": {
                         "type": "string",
-                        "description": "Substring or simple regex-like pattern to search for."
+                        "description": "Substring or simple regex-like pattern to search for.",
                     },
                     "case_sensitive": {
                         "type": "boolean",
                         "default": False,
-                        "description": "If true, perform a case-sensitive match."
+                        "description": "If true, perform a case-sensitive match.",
                     },
                     "max_matches_per_function": {
                         "type": "integer",
                         "default": 3,
-                        "description": "Maximum matches to return per function/file."
+                        "description": "Maximum matches to return per function/file.",
                     },
                     "limit": {
                         "type": "integer",
                         "default": 50,
-                        "description": "Maximum total matches to return."
+                        "description": "Maximum total matches to return.",
                     },
                     "offset": {
                         "type": "integer",
                         "default": 0,
-                        "description": "Skip this many matches from the start (pagination)."
-                    }
+                        "description": "Skip this many matches from the start (pagination).",
+                    },
                 },
-                "required": ["pattern"]
-            }
-        }
-    }
+                "required": ["pattern"],
+            },
+        },
+    },
 ]
 
 # ============================================================================

@@ -24,3 +24,6 @@ samples/
 # MacOS
 
 .DS_Store
+
+# Demo
+demo/

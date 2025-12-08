@@ -102,6 +102,10 @@ RUN find "${GHIDRA_INSTALL_DIR}/Ghidra/Features/Decompiler/os" -type f -name "de
 
 # Python configuration
 ENV PYTHONUNBUFFERED=1
+# Force color output in Docker (rich library)
+ENV FORCE_COLOR=1
+# Set safe default terminal width to prevent wrapping
+ENV COLUMNS=100
 
 # Copy application sources and install dependencies with uv
 WORKDIR /workspace/project

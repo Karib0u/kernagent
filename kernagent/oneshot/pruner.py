@@ -26,61 +26,197 @@ GENERATION_VERSION = "oneshot_pruner_v1"
 
 CAPABILITY_KEYWORDS: Mapping[str, Sequence[str]] = {
     "network": [
-        r"wininet", r"winhttp", r"urlmon", r"cfnetwork", r"nsurlsession", r"inet",
-        r"socket", r"connect", r"send", r"recv", r"bind", r"listen", r"accept",
-        r"http", r"ws2_", r"gethostbyname", r"dns", r"getaddrinfo", r"curl", r"wget",
+        r"wininet",
+        r"winhttp",
+        r"urlmon",
+        r"cfnetwork",
+        r"nsurlsession",
+        r"inet",
+        r"socket",
+        r"connect",
+        r"send",
+        r"recv",
+        r"bind",
+        r"listen",
+        r"accept",
+        r"http",
+        r"ws2_",
+        r"gethostbyname",
+        r"dns",
+        r"getaddrinfo",
+        r"curl",
+        r"wget",
     ],
     "filesystem": [
-        r"createfile", r"readfile", r"writefile", r"deletefile", r"copyfile",
-        r"movefile", r"findfirst", r"findnext", r"setfile", r"getfile",
-        r"fopen", r"fread", r"fwrite", r"unlink", r"stat", r"chmod", r"mkdir",
-        r"rmdir", r"gettemp", r"shfileoperation",
+        r"createfile",
+        r"readfile",
+        r"writefile",
+        r"deletefile",
+        r"copyfile",
+        r"movefile",
+        r"findfirst",
+        r"findnext",
+        r"setfile",
+        r"getfile",
+        r"fopen",
+        r"fread",
+        r"fwrite",
+        r"unlink",
+        r"stat",
+        r"chmod",
+        r"mkdir",
+        r"rmdir",
+        r"gettemp",
+        r"shfileoperation",
     ],
     "process": [
-        r"createprocess", r"createremotethread", r"openprocess", r"terminateprocess",
-        r"shellexecute", r"winexec", r"ntcreateprocess", r"ntqueueapcthread",
-        r"fork", r"execve", r"ptrace", r"task_for_pid", r"kill", r"launchapplication",
+        r"createprocess",
+        r"createremotethread",
+        r"openprocess",
+        r"terminateprocess",
+        r"shellexecute",
+        r"winexec",
+        r"ntcreateprocess",
+        r"ntqueueapcthread",
+        r"fork",
+        r"execve",
+        r"ptrace",
+        r"task_for_pid",
+        r"kill",
+        r"launchapplication",
     ],
     "memory_injection": [
-        r"virtualalloc", r"virtualallocex", r"virtualprotect", r"virtualquery",
-        r"writeprocessmemory", r"readprocessmemory", r"mapviewoffile", r"unmapviewoffile",
-        r"setthreadcontext", r"getthreadcontext", r"mprotect", r"dlopen", r"dlsym",
-        r"mach_vm_", r"mach_port", r"mach_task_self",
+        r"virtualalloc",
+        r"virtualallocex",
+        r"virtualprotect",
+        r"virtualquery",
+        r"writeprocessmemory",
+        r"readprocessmemory",
+        r"mapviewoffile",
+        r"unmapviewoffile",
+        r"setthreadcontext",
+        r"getthreadcontext",
+        r"mprotect",
+        r"dlopen",
+        r"dlsym",
+        r"mach_vm_",
+        r"mach_port",
+        r"mach_task_self",
     ],
     "crypto": [
-        r"crypt", r"bcrypt", r"ncrypt", r"aes", r"des", r"sha", r"md5",
-        r"hash", r"rsa", r"cccrypt", r"secrandom", r"commoncrypto",
+        r"crypt",
+        r"bcrypt",
+        r"ncrypt",
+        r"aes",
+        r"des",
+        r"sha",
+        r"md5",
+        r"hash",
+        r"rsa",
+        r"cccrypt",
+        r"secrandom",
+        r"commoncrypto",
     ],
     "persistence": [
-        r"regsetvalue", r"regcreatekey", r"regopenkey", r"runonce", r"runservicestart",
-        r"schtask", r"schedule", r"createservice", r"startservice", r"setservice",
-        r"launchagent", r"launchdaemon", r"loginitem", r"initlaunch", r"nsbundle",
+        r"regsetvalue",
+        r"regcreatekey",
+        r"regopenkey",
+        r"runonce",
+        r"runservicestart",
+        r"schtask",
+        r"schedule",
+        r"createservice",
+        r"startservice",
+        r"setservice",
+        r"launchagent",
+        r"launchdaemon",
+        r"loginitem",
+        r"initlaunch",
+        r"nsbundle",
     ],
     "privilege": [
-        r"adjusttokenprivileges", r"lookupprivilege", r"setthreadtoken",
-        r"seteuid", r"setuid", r"seteuid", r"setreuid", r"chmod", r"chown",
-        r"se", r"privilege", r"impersonat", r"token", r"authoriza", r"sudo",
+        r"adjusttokenprivileges",
+        r"lookupprivilege",
+        r"setthreadtoken",
+        r"seteuid",
+        r"setuid",
+        r"seteuid",
+        r"setreuid",
+        r"chmod",
+        r"chown",
+        r"se",
+        r"privilege",
+        r"impersonat",
+        r"token",
+        r"authoriza",
+        r"sudo",
     ],
     "anti_debug_vm": [
-        r"isdebuggerpresent", r"checkremotedebuggerpresent", r"outputdebugstring",
-        r"ntqueryinformationprocess", r"ntsetinformationthread", r"verifydebugger",
-        r"gettickcount", r"queryperformancecounter", r"getlocaltime", r"rdtsc",
-        r"cpuid", r"vmware", r"virtualbox", r"hyperv", r"sandbox", r"debugactiveprocess",
+        r"isdebuggerpresent",
+        r"checkremotedebuggerpresent",
+        r"outputdebugstring",
+        r"ntqueryinformationprocess",
+        r"ntsetinformationthread",
+        r"verifydebugger",
+        r"gettickcount",
+        r"queryperformancecounter",
+        r"getlocaltime",
+        r"rdtsc",
+        r"cpuid",
+        r"vmware",
+        r"virtualbox",
+        r"hyperv",
+        r"sandbox",
+        r"debugactiveprocess",
     ],
     "user_cred_phishing": [
-        r"credui", r"credread", r"internetsetoption", r"setwindowsHook",
-        r"getasynckeystate", r"setwinhookex", r"osascript", r"nsalert",
-        r"nsapp", r"uiapplication", r"secitemcopy", r"credential", r"keychain",
+        r"credui",
+        r"credread",
+        r"internetsetoption",
+        r"setwindowsHook",
+        r"getasynckeystate",
+        r"setwinhookex",
+        r"osascript",
+        r"nsalert",
+        r"nsapp",
+        r"uiapplication",
+        r"secitemcopy",
+        r"credential",
+        r"keychain",
     ],
     "scripting_shell": [
-        r"cmd.exe", r"powershell", r"pwsh", r"wscript", r"cscript", r"mshta",
-        r"shshell", r"system", r"popen", r"/bin/sh", r"/bin/bash", r"osascript",
-        r"bash", r"python", r"perl", r"ruby", r"powershellscript",
+        r"cmd.exe",
+        r"powershell",
+        r"pwsh",
+        r"wscript",
+        r"cscript",
+        r"mshta",
+        r"shshell",
+        r"system",
+        r"popen",
+        r"/bin/sh",
+        r"/bin/bash",
+        r"osascript",
+        r"bash",
+        r"python",
+        r"perl",
+        r"ruby",
+        r"powershellscript",
     ],
     "ipc": [
-        r"createnamedpipe", r"connectnamedpipe", r"createpipe", r"peeknamedpipe",
-        r"waitnamedpipe", r"ncalrpc", r"alpc", r"mach_port", r"sndmsg",
-        r"sharedmemory", r"shmget", r"messagequeue", r"mq_open",
+        r"createnamedpipe",
+        r"connectnamedpipe",
+        r"createpipe",
+        r"peeknamedpipe",
+        r"waitnamedpipe",
+        r"ncalrpc",
+        r"alpc",
+        r"mach_port",
+        r"sndmsg",
+        r"sharedmemory",
+        r"shmget",
+        r"messagequeue",
+        r"mq_open",
     ],
 }
 
@@ -109,45 +245,138 @@ DOMAIN_REGEX = re.compile(
 )
 IP_REGEX = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 WIN_PATH_REGEX = re.compile(r"[A-Za-z]:\\")
-POSIX_PATH_REGEX = re.compile(r"^/|/etc/|/var/|/usr/|/bin/|/sbin/|/home/|~/", re.IGNORECASE)
+POSIX_PATH_REGEX = re.compile(
+    r"^/|/etc/|/var/|/usr/|/bin/|/sbin/|/home/|~/", re.IGNORECASE
+)
 REGISTRY_REGEX = re.compile(r"HK(LM|CU|CR|U|CC)\\", re.IGNORECASE)
 
 COMMAND_KEYWORDS = [
-    "cmd.exe", "powershell", "pwsh", "wscript", "cscript", "mshta", "/bin/sh",
-    "/bin/bash", "bash -c", "sh -c", "python ", "perl ", "ruby ", "osascript",
-    "Invoke-Expression", "Invoke-WebRequest", "curl ", "wget ", "scp ",
+    "cmd.exe",
+    "powershell",
+    "pwsh",
+    "wscript",
+    "cscript",
+    "mshta",
+    "/bin/sh",
+    "/bin/bash",
+    "bash -c",
+    "sh -c",
+    "python ",
+    "perl ",
+    "ruby ",
+    "osascript",
+    "Invoke-Expression",
+    "Invoke-WebRequest",
+    "curl ",
+    "wget ",
+    "scp ",
 ]
 
 AUTH_KEYWORDS = [
-    "password", "passwd", "token", "secret", "apikey", "auth", "login", "credential",
-    "otp", "pin", "passphrase",
+    "password",
+    "passwd",
+    "token",
+    "secret",
+    "apikey",
+    "auth",
+    "login",
+    "credential",
+    "otp",
+    "pin",
+    "passphrase",
 ]
 
 SECURITY_KEYWORDS = [
-    "sandbox", "virtualbox", "vmware", "hyper-v", "qemu", "debugger", "rdtsc",
-    "antivirus", "av", "edr", "isdebuggerpresent", "xen", "kvm",
+    "sandbox",
+    "virtualbox",
+    "vmware",
+    "hyper-v",
+    "qemu",
+    "debugger",
+    "rdtsc",
+    "antivirus",
+    "av",
+    "edr",
+    "isdebuggerpresent",
+    "xen",
+    "kvm",
 ]
 
 SUSPICIOUS_CMD_FRAGMENTS = [
-    "chmod +x", "base64", "certutil", "bitsadmin", "whoami", "netstat", "tasklist",
-    "sc ", "reg ", "schtasks", "powershell", "curl", "wget", "ldb.exe", "sh -c",
+    "chmod +x",
+    "base64",
+    "certutil",
+    "bitsadmin",
+    "whoami",
+    "netstat",
+    "tasklist",
+    "sc ",
+    "reg ",
+    "schtasks",
+    "powershell",
+    "curl",
+    "wget",
+    "ldb.exe",
+    "sh -c",
 ]
 
 STANDARD_SECTION_NAMES = {
     "pe": {
-        "headers", ".text", ".rdata", ".data", ".pdata", ".edata", ".idata",
-        ".tls", ".bss", ".rsrc", ".reloc", ".textbss", ".didat", ".xdata",
+        "headers",
+        ".text",
+        ".rdata",
+        ".data",
+        ".pdata",
+        ".edata",
+        ".idata",
+        ".tls",
+        ".bss",
+        ".rsrc",
+        ".reloc",
+        ".textbss",
+        ".didat",
+        ".xdata",
     },
     "elf": {
-        ".text", ".plt", ".plt.sec", ".plt.got", ".got", ".got.plt", ".rodata",
-        ".data", ".data.rel.ro", ".bss", ".tbss", ".init", ".fini", ".ctors",
-        ".dtors", ".eh_frame", ".init_array", ".fini_array", ".comment",
-        ".note.gnu.build-id", ".interp",
+        ".text",
+        ".plt",
+        ".plt.sec",
+        ".plt.got",
+        ".got",
+        ".got.plt",
+        ".rodata",
+        ".data",
+        ".data.rel.ro",
+        ".bss",
+        ".tbss",
+        ".init",
+        ".fini",
+        ".ctors",
+        ".dtors",
+        ".eh_frame",
+        ".init_array",
+        ".fini_array",
+        ".comment",
+        ".note.gnu.build-id",
+        ".interp",
     },
     "mach-o": {
-        "__text", "__stubs", "__stub_helper", "__cstring", "__const", "__data",
-        "__data_const", "__constdata", "__auth_const", "__objc_meth", "__objc_class",
-        "__objc_data", "__bss", "__common", "__linkedit", "__la_symbol_ptr",
+        "__text",
+        "__stubs",
+        "__stub_helper",
+        "__cstring",
+        "__const",
+        "__data",
+        "__data_const",
+        "__constdata",
+        "__auth_const",
+        "__objc_meth",
+        "__objc_class",
+        "__objc_data",
+        "__bss",
+        "__common",
+        "__linkedit",
+        "__la_symbol_ptr",
     },
     "default": {".text", ".data", ".bss", ".rodata", ".rdata", ".init", ".fini"},
 }
@@ -199,7 +428,11 @@ def _normalize_format(fmt: Optional[str]) -> str:
     if not fmt:
         return "unknown"
     fmt_lower = fmt.lower()
-    if "portable executable" in fmt_lower or fmt_lower.startswith("pe") or "coff" in fmt_lower:
+    if (
+        "portable executable" in fmt_lower
+        or fmt_lower.startswith("pe")
+        or "coff" in fmt_lower
+    ):
         return "pe"
     if "elf" in fmt_lower:
         return "elf"
@@ -218,12 +451,17 @@ def _rule_rank_for_capa(rule: Dict[str, Any]) -> int:
     score += min(len(mbc), 3) * 3
     score += min(rule.get("match_count", 0), 10)
     namespace = (rule.get("namespace") or "").lower()
-    if any(keyword in namespace for keyword in ("network", "process", "persistence", "credential", "crypto")):
+    if any(
+        keyword in namespace
+        for keyword in ("network", "process", "persistence", "credential", "crypto")
+    ):
         score += 2
     return score
 
 
-def _summarize_capa_for_oneshot(capa_summary: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _summarize_capa_for_oneshot(
+    capa_summary: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
     """Extract high-signal CAPA data for the oneshot payload."""
 
     if not capa_summary:
@@ -235,7 +473,11 @@ def _summarize_capa_for_oneshot(capa_summary: Optional[Dict[str, Any]]) -> Optio
 
     ranked = sorted(
         rules,
-        key=lambda rule: (-_rule_rank_for_capa(rule), rule.get("namespace") or "", rule.get("name") or ""),
+        key=lambda rule: (
+            -_rule_rank_for_capa(rule),
+            rule.get("namespace") or "",
+            rule.get("name") or "",
+        ),
     )[:8]
 
     top_rules = []
@@ -266,9 +508,6 @@ def _summarize_capa_for_oneshot(capa_summary: Optional[Dict[str, Any]]) -> Optio
         },
         "top_rules": top_rules,
     }
-    if "coff" in fmt_lower:
-        return "pe"
-    return "unknown"
 
 
 def _determine_arch(meta: Dict[str, Any]) -> str:
@@ -296,7 +535,9 @@ def _section_permission_string(perms: Dict[str, Any]) -> str:
     return f"{read}{write}{execute}"
 
 
-def _analyze_sections(sections: List[Dict[str, Any]], fmt: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+def _analyze_sections(
+    sections: List[Dict[str, Any]], fmt: str
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     has_rwx = False
     suspicious: List[Dict[str, Any]] = []
     standard_names = STANDARD_SECTION_NAMES.get(fmt, STANDARD_SECTION_NAMES["default"])
@@ -340,7 +581,9 @@ def _match_capabilities(func_name: str, library: Optional[str]) -> List[str]:
     return matches
 
 
-def _build_import_capabilities(imports_exports: Dict[str, Any]) -> Tuple[Dict[str, List[str]], Dict[str, set]]:
+def _build_import_capabilities(
+    imports_exports: Dict[str, Any],
+) -> Tuple[Dict[str, List[str]], Dict[str, set]]:
     bucketed: Dict[str, List[str]] = {cap: [] for cap in CAPABILITY_ORDER}
     api_cap_map: Dict[str, set] = defaultdict(set)
 
@@ -465,7 +708,9 @@ def _resolve_function_refs(
     return refs, eas
 
 
-def _build_callgraph_maps(callgraph_path: Path, name_by_ea: Dict[str, str]) -> Tuple[Dict[str, Dict[str, str]], Dict[str, Dict[str, str]]]:
+def _build_callgraph_maps(
+    callgraph_path: Path, name_by_ea: Dict[str, str]
+) -> Tuple[Dict[str, Dict[str, str]], Dict[str, Dict[str, str]]]:
     callers: Dict[str, Dict[str, str]] = defaultdict(dict)
     callees: Dict[str, Dict[str, str]] = defaultdict(dict)
     if not callgraph_path.exists():
@@ -494,7 +739,9 @@ def _parse_address(value: Optional[str]) -> Optional[int]:
         return None
 
 
-def _find_section_name(addr: Optional[int], sections: List[Dict[str, Any]]) -> Optional[str]:
+def _find_section_name(
+    addr: Optional[int], sections: List[Dict[str, Any]]
+) -> Optional[str]:
     if addr is None:
         return None
     for section in sections:
@@ -554,7 +801,19 @@ def _looks_like_config(value: Any) -> bool:
     if not isinstance(value, str):
         return False
     lower = value.lower()
-    if any(token in lower for token in ["server=", "host=", "domain=", "token=", "key=", "url=", "api=", "user="]):
+    if any(
+        token in lower
+        for token in [
+            "server=",
+            "host=",
+            "domain=",
+            "token=",
+            "key=",
+            "url=",
+            "api=",
+            "user=",
+        ]
+    ):
         return True
     stripped = lower.strip()
     if stripped.startswith(("{", "[", "<?xml", "<config")):
@@ -576,22 +835,33 @@ def _build_suspicion_signals(
     def has_any(cap: str) -> bool:
         return bool(imports_by_cap.get(cap))
 
-    interesting_caps = {"network", "filesystem", "process", "memory_injection", "persistence", "privilege", "user_cred_phishing", "scripting_shell"}
     complex_func = any(
-        (func.get("cyclomatic_complexity") or 0) >= 30 or (func.get("size_bytes") or 0) >= 2000
+        (func.get("cyclomatic_complexity") or 0) >= 30
+        or (func.get("size_bytes") or 0) >= 2000
         for func in key_functions
     )
 
     return {
-        "uses_network": has_any("network") or any(string_kind_counts.get(kind, 0) for kind in ("url", "domain", "ip")),
-        "uses_filesystem": has_any("filesystem") or string_kind_counts.get("path", 0) > 0,
-        "spawns_processes_or_shell": has_any("process") or has_any("scripting_shell") or string_kind_counts.get("command", 0) > 0,
-        "allocates_remote_or_rwx_memory": has_any("memory_injection") or bool(sections_info.get("has_rwx")),
-        "has_persistence_indicators": has_any("persistence") or string_kind_counts.get("registry", 0) > 0,
-        "has_credential_theft_indicators": has_any("user_cred_phishing") or string_kind_counts.get("auth", 0) > 0,
-        "has_anti_debug_vm_indicators": has_any("anti_debug_vm") or string_kind_counts.get("keyword", 0) > 0,
-        "has_suspicious_urls_or_ips": any(string_kind_counts.get(kind, 0) for kind in ("url", "domain", "ip")),
-        "has_overlay_or_ui_cred_strings": has_any("user_cred_phishing") or string_kind_counts.get("auth", 0) > 0,
+        "uses_network": has_any("network")
+        or any(string_kind_counts.get(kind, 0) for kind in ("url", "domain", "ip")),
+        "uses_filesystem": has_any("filesystem")
+        or string_kind_counts.get("path", 0) > 0,
+        "spawns_processes_or_shell": has_any("process")
+        or has_any("scripting_shell")
+        or string_kind_counts.get("command", 0) > 0,
+        "allocates_remote_or_rwx_memory": has_any("memory_injection")
+        or bool(sections_info.get("has_rwx")),
+        "has_persistence_indicators": has_any("persistence")
+        or string_kind_counts.get("registry", 0) > 0,
+        "has_credential_theft_indicators": has_any("user_cred_phishing")
+        or string_kind_counts.get("auth", 0) > 0,
+        "has_anti_debug_vm_indicators": has_any("anti_debug_vm")
+        or string_kind_counts.get("keyword", 0) > 0,
+        "has_suspicious_urls_or_ips": any(
+            string_kind_counts.get(kind, 0) for kind in ("url", "domain", "ip")
+        ),
+        "has_overlay_or_ui_cred_strings": has_any("user_cred_phishing")
+        or string_kind_counts.get("auth", 0) > 0,
         "is_unusually_small_but_complex": (file_size or 0) <= 200_000 and complex_func,
         "has_shell_execution_strings": string_kind_counts.get("command", 0) > 0,
     }
@@ -627,7 +897,9 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
     # Build minimal function records
     functions: List[Dict[str, Any]] = []
     name_by_ea: Dict[str, str] = {}
-    ea_by_name: Dict[str, str] = {k: v for k, v in (index_data.get("by_name") or {}).items()}
+    ea_by_name: Dict[str, str] = {
+        k: v for k, v in (index_data.get("by_name") or {}).items()
+    }
 
     for entry in _iter_jsonl(functions_path):
         record = {
@@ -653,15 +925,21 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
         "sha256": meta.get("sha256"),
         "name": meta.get("file_name"),
         "size": meta.get("file_size"),
-        "format": _normalize_format(meta.get("executable_format") or meta.get("format")),
+        "format": _normalize_format(
+            meta.get("executable_format") or meta.get("format")
+        ),
         "arch": _determine_arch(meta),
         "language_id": meta.get("language"),
         "image_base": _normalize_hex(meta.get("image_base")),
         "endian": meta.get("endian"),
     }
 
-    section_summary, suspicious_sections = _analyze_sections(sections, file_info["format"])
-    suspicious_section_names = {sec["name"].lower() for sec in suspicious_sections if sec.get("name")}
+    section_summary, suspicious_sections = _analyze_sections(
+        sections, file_info["format"]
+    )
+    suspicious_section_names = {
+        sec["name"].lower() for sec in suspicious_sections if sec.get("name")
+    }
 
     for function in functions:
         ranges = function.get("ranges") or []
@@ -671,12 +949,18 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
         function["section_name"] = section_name
 
     # Imports → capabilities
-    imports_by_capability, api_capabilities = _build_import_capabilities(imports_exports)
+    imports_by_capability, api_capabilities = _build_import_capabilities(
+        imports_exports
+    )
 
     if verbose:
-        detected_caps = [cap for cap in CAPABILITY_ORDER if imports_by_capability.get(cap)]
+        detected_caps = [
+            cap for cap in CAPABILITY_ORDER if imports_by_capability.get(cap)
+        ]
         if detected_caps:
-            logger.info("Detected capabilities from imports: %s", ", ".join(detected_caps))
+            logger.info(
+                "Detected capabilities from imports: %s", ", ".join(detected_caps)
+            )
 
     # Load strings and map to functions
     interesting_strings: List[Dict[str, Any]] = []
@@ -688,7 +972,9 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
         value = entry.get("value")
         if not value:
             continue
-        refs, ref_eas = _resolve_function_refs(entry.get("xrefs"), name_by_ea, ea_by_name)
+        refs, ref_eas = _resolve_function_refs(
+            entry.get("xrefs"), name_by_ea, ea_by_name
+        )
         kind = _classify_string(value)
         if kind:
             # Always count string kinds for suspicion signals, regardless of MAX_STRINGS limit
@@ -711,9 +997,15 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
 
     if verbose:
         total_string_kinds = sum(string_kind_counts.values())
-        logger.info("Pruned strings: selected %d/%d interesting strings", len(interesting_strings), total_string_kinds)
+        logger.info(
+            "Pruned strings: selected %d/%d interesting strings",
+            len(interesting_strings),
+            total_string_kinds,
+        )
         if string_kind_counts:
-            kind_breakdown = ", ".join(f"{kind}={count}" for kind, count in string_kind_counts.most_common(5))
+            kind_breakdown = ", ".join(
+                f"{kind}={count}" for kind, count in string_kind_counts.most_common(5)
+            )
             logger.info("String breakdown: %s", kind_breakdown)
 
     # Callgraph
@@ -739,7 +1031,11 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
             "dllinstall",
         ]
     }
-    exported_names = {entry.get("name") for entry in imports_exports.get("exports", []) if entry.get("name")}
+    exported_names = {
+        entry.get("name")
+        for entry in imports_exports.get("exports", [])
+        if entry.get("name")
+    }
     exported_lower = {name.lower() for name in exported_names}
     entrypoint_names = entrypoint_candidates | exported_lower
 
@@ -760,7 +1056,9 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
 
     if verbose:
         funcs_with_caps = sum(1 for caps in function_capabilities.values() if caps)
-        logger.info("Mapped capabilities to %d/%d functions", funcs_with_caps, len(functions))
+        logger.info(
+            "Mapped capabilities to %d/%d functions", funcs_with_caps, len(functions)
+        )
 
     # Score + select
     scored_functions = []
@@ -800,13 +1098,20 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
                 break
 
     if verbose:
-        logger.info("Selected %d/%d key functions for analysis", len(selected), len(functions))
+        logger.info(
+            "Selected %d/%d key functions for analysis", len(selected), len(functions)
+        )
 
     key_functions_output: List[Dict[str, Any]] = []
     for function in selected:
         ea = function["ea"]
         metrics = function.get("metrics") or {}
-        caps = sorted(function_capabilities.get(ea, []), key=lambda c: CAPABILITY_ORDER.index(c) if c in CAPABILITY_ORDER else len(CAPABILITY_ORDER))
+        caps = sorted(
+            function_capabilities.get(ea, []),
+            key=lambda c: CAPABILITY_ORDER.index(c)
+            if c in CAPABILITY_ORDER
+            else len(CAPABILITY_ORDER),
+        )
         callers = callers_map.get(ea)
         callees = callees_map.get(ea)
 
@@ -822,12 +1127,12 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
             for callee in function.get("xrefs_out", []):
                 callee_ea = callee.get("ea")
                 if callee_ea and not callee_ea.startswith("EXTERNAL"):
-                    fallback_callees[callee_ea] = callee.get("name") or name_by_ea.get(callee_ea, callee_ea)
+                    fallback_callees[callee_ea] = callee.get("name") or name_by_ea.get(
+                        callee_ea, callee_ea
+                    )
             callees = fallback_callees
 
-        strings_for_func = [
-            value for value, _kind in function_strings.get(ea, [])
-        ]
+        strings_for_func = [value for value, _kind in function_strings.get(ea, [])]
 
         key_functions_output.append(
             {
@@ -875,7 +1180,10 @@ def build_oneshot_summary(archive_dir: Path, verbose: bool = False) -> Dict[str,
     capa_raw = _read_optional_json(capa_summary_path)
     capa_highlights = _summarize_capa_for_oneshot(capa_raw)
     if verbose and capa_highlights:
-        logger.info("Included CAPA highlights (%d rules)", capa_highlights["counts"]["rules"] if capa_highlights.get("counts") else 0)
+        logger.info(
+            "Included CAPA highlights (%d rules)",
+            capa_highlights["counts"]["rules"] if capa_highlights.get("counts") else 0,
+        )
 
     summary = {
         "file": file_info,

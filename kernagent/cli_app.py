@@ -61,11 +61,19 @@ def init() -> None:
 @app.command()
 def analyze(
     binary: Annotated[Path, typer.Argument(help="Path to the binary to analyze")],
-    json_output: Annotated[bool, typer.Option("--json", help="Output raw JSON")] = False,
-    full: Annotated[bool, typer.Option("--full", help="Build full multi-agent context")] = False,
-    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose logging")] = False,
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Output raw JSON")
+    ] = False,
+    full: Annotated[
+        bool, typer.Option("--full", help="Build full multi-agent context")
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
+    ] = False,
     model: Annotated[Optional[str], typer.Option(help="Override LLM model")] = None,
-    base_url: Annotated[Optional[str], typer.Option(help="Override API base URL")] = None,
+    base_url: Annotated[
+        Optional[str], typer.Option(help="Override API base URL")
+    ] = None,
     api_key: Annotated[Optional[str], typer.Option(help="Override API key")] = None,
 ) -> None:
     """
@@ -93,9 +101,13 @@ def analyze(
 @app.command()
 def chat(
     binary: Annotated[Path, typer.Argument(help="Path to the binary to analyze")],
-    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose logging")] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
+    ] = False,
     model: Annotated[Optional[str], typer.Option(help="Override LLM model")] = None,
-    base_url: Annotated[Optional[str], typer.Option(help="Override API base URL")] = None,
+    base_url: Annotated[
+        Optional[str], typer.Option(help="Override API base URL")
+    ] = None,
     api_key: Annotated[Optional[str], typer.Option(help="Override API key")] = None,
 ) -> None:
     """
@@ -123,11 +135,19 @@ def chat(
 @app.command()
 def snapshot(
     binary: Annotated[Optional[Path], typer.Argument(help="Binary to snapshot")] = None,
-    list_snapshots: Annotated[bool, typer.Option("--list", help="List all snapshots")] = False,
-    force: Annotated[bool, typer.Option("--force", help="Force rebuild existing snapshot")] = False,
-    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose logging")] = False,
+    list_snapshots: Annotated[
+        bool, typer.Option("--list", help="List all snapshots")
+    ] = False,
+    force: Annotated[
+        bool, typer.Option("--force", help="Force rebuild existing snapshot")
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
+    ] = False,
     model: Annotated[Optional[str], typer.Option(help="Override LLM model")] = None,
-    base_url: Annotated[Optional[str], typer.Option(help="Override API base URL")] = None,
+    base_url: Annotated[
+        Optional[str], typer.Option(help="Override API base URL")
+    ] = None,
     api_key: Annotated[Optional[str], typer.Option(help="Override API key")] = None,
 ) -> None:
     """

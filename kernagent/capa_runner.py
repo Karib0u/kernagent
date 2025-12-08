@@ -71,7 +71,9 @@ def _resolve_rules_path(explicit: Optional[Path]) -> Optional[Path]:
     if path.exists():
         return path
 
-    logger.warning("CAPA_RULES_PATH=%s does not exist; falling back to built-in rules", env_value)
+    logger.warning(
+        "CAPA_RULES_PATH=%s does not exist; falling back to built-in rules", env_value
+    )
     return None
 
 
@@ -187,7 +189,10 @@ def _rule_score(summary: CapaRuleSummary) -> int:
         score += 100
     if summary.mbc:
         score += 40
-    if summary.namespace and any(keyword in summary.namespace.lower() for keyword in ("network", "process", "crypto", "persistence")):
+    if summary.namespace and any(
+        keyword in summary.namespace.lower()
+        for keyword in ("network", "process", "crypto", "persistence")
+    ):
         score += 10
     score += min(summary.match_count, 25)
     if summary.tags:
@@ -222,8 +227,14 @@ def _aggregate_highlights(rules: Iterable[CapaRuleSummary]) -> Dict[str, Any]:
         for attack_id, count in attack_counter.most_common(8)
     ]
 
-    top_tactics = [{"tactic": name, "count": count} for name, count in tactic_counter.most_common(8)]
-    top_namespaces = [{"namespace": name, "count": count} for name, count in namespace_counter.most_common(8)]
+    top_tactics = [
+        {"tactic": name, "count": count}
+        for name, count in tactic_counter.most_common(8)
+    ]
+    top_namespaces = [
+        {"namespace": name, "count": count}
+        for name, count in namespace_counter.most_common(8)
+    ]
 
     return {
         "top_attack_ids": top_attack,
@@ -253,7 +264,9 @@ def _analyze_with_capa(binary_path: Path, rules_path: Optional[Path]):
         disable_progress=True,
     )
 
-    capabilities = capa.capabilities.common.find_capabilities(rules, extractor, disable_progress=True)
+    capabilities = capa.capabilities.common.find_capabilities(
+        rules, extractor, disable_progress=True
+    )
 
     meta = capa.loader.collect_metadata(
         ["kernagent", "capa"],
@@ -265,13 +278,20 @@ def _analyze_with_capa(binary_path: Path, rules_path: Optional[Path]):
         capabilities,
     )
 
-    meta.analysis.layout = capa.loader.compute_layout(rules, extractor, capabilities.matches)
+    meta.analysis.layout = capa.loader.compute_layout(
+        rules, extractor, capabilities.matches
+    )
 
     doc = rd.ResultDocument.from_capa(meta, rules, capabilities.matches)
     return doc, rules
 
 
-def build_capa_summary(binary_path: Path, output_dir: Path, rules_path: Path | None = None, verbose: bool = False) -> Optional[Path]:
+def build_capa_summary(
+    binary_path: Path,
+    output_dir: Path,
+    rules_path: Path | None = None,
+    verbose: bool = False,
+) -> Optional[Path]:
     """
     Execute flare-capa on `binary_path` and write a filtered JSON summary.
 

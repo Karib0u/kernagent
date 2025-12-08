@@ -33,14 +33,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Deprecated prompts from prompts.py
 
-## [1.0.3] - 2024-12-XX
-
-### Initial Release
-- Core functionality for reverse engineering with Ghidra snapshots
-- LLM-powered binary analysis agent
-- CAPA integration for capability detection
-- Snapshot extraction and management
-- Basic CLI interface
-
 [1.1.0]: https://github.com/Karib0u/kernagent/compare/v1.0.3...v1.1.0
 [1.0.2]: https://github.com/Karib0u/kernagent/releases/tag/v1.0.2

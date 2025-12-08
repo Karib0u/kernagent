@@ -112,8 +112,12 @@ class TestSearchStrings:
 
     def test_search_strings_case_sensitive(self, snapshot):
         """Case-sensitive search should respect case."""
-        result_insensitive = snapshot.search_strings("HTTP", case_sensitive=False, limit=50)
-        result_sensitive = snapshot.search_strings("HTTP", case_sensitive=True, limit=50)
+        result_insensitive = snapshot.search_strings(
+            "HTTP", case_sensitive=False, limit=50
+        )
+        result_sensitive = snapshot.search_strings(
+            "HTTP", case_sensitive=True, limit=50
+        )
 
         assert "results" in result_insensitive
         assert "results" in result_sensitive

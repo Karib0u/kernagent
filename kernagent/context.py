@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Optional
 
 from .config import Settings
 from .llm_client import LLMClient
@@ -12,6 +12,8 @@ from .log import get_logger
 from .oneshot import build_oneshot_summary
 
 logger = get_logger(__name__)
+
+ProgressFn = Optional[Callable[[str], None]]
 
 CONTEXT_VERSION = "v1"
 CONTEXT_HEADER = "[kernagent_context]"
@@ -354,7 +356,9 @@ def ensure_oneshot_summary(snapshot_dir: Path, verbose: bool = False) -> Dict[st
     if verbose:
         logger.info("Building oneshot_summary.json for %s", snapshot_dir)
     summary = build_oneshot_summary(snapshot_dir, verbose=verbose)
-    summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+    summary_path.write_text(
+        json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8"
+    )
     return summary
 
 
@@ -388,7 +392,9 @@ def write_context_file(path: Path, markdown: str, level: str) -> None:
     path.write_text(header + markdown.strip() + "\n", encoding="utf-8")
 
 
-def _run_json_agent(llm: LLMClient, system_prompt: str, payload: Dict[str, Any], verbose: bool = False) -> Dict[str, Any]:
+def _run_json_agent(
+    llm: LLMClient, system_prompt: str, payload: Dict[str, Any], verbose: bool = False
+) -> Dict[str, Any]:
     """Call an agent expected to return JSON."""
 
     response = llm.chat(
@@ -407,19 +413,25 @@ def _run_json_agent(llm: LLMClient, system_prompt: str, payload: Dict[str, Any],
         raise ValueError(f"Agent response is not valid JSON: {exc}") from exc
 
 
-def run_capabilities_agent(llm: LLMClient, summary: Dict[str, Any], verbose: bool = False) -> Dict[str, Any]:
+def run_capabilities_agent(
+    llm: LLMClient, summary: Dict[str, Any], verbose: bool = False
+) -> Dict[str, Any]:
     """Execute the capabilities agent and parse JSON output."""
 
     return _run_json_agent(llm, CAPABILITIES_SYSTEM_PROMPT, summary, verbose=verbose)
 
 
-def run_structure_agent(llm: LLMClient, summary: Dict[str, Any], verbose: bool = False) -> Dict[str, Any]:
+def run_structure_agent(
+    llm: LLMClient, summary: Dict[str, Any], verbose: bool = False
+) -> Dict[str, Any]:
     """Execute the structure agent and parse JSON output."""
 
     return _run_json_agent(llm, STRUCTURE_SYSTEM_PROMPT, summary, verbose=verbose)
 
 
-def run_obfuscation_agent(llm: LLMClient, summary: Dict[str, Any], verbose: bool = False) -> Dict[str, Any]:
+def run_obfuscation_agent(
+    llm: LLMClient, summary: Dict[str, Any], verbose: bool = False
+) -> Dict[str, Any]:
     """Execute the obfuscation agent and parse JSON output."""
 
     return _run_json_agent(llm, OBFUSCATION_SYSTEM_PROMPT, summary, verbose=verbose)
@@ -473,7 +485,9 @@ def run_context_synth_agent(
     return (response.choices[0].message.content or "").strip()
 
 
-def build_basic_context_markdown(summary: Dict[str, Any], settings: Settings, verbose: bool = False) -> str:
+def build_basic_context_markdown(
+    summary: Dict[str, Any], settings: Settings, verbose: bool = False
+) -> str:
     """Build a BASIC context (Markdown) from the oneshot_summary via a single agent."""
 
     llm = LLMClient(settings)
@@ -488,25 +502,32 @@ def build_basic_context_markdown(summary: Dict[str, Any], settings: Settings, ve
     return (response.choices[0].message.content or "").strip()
 
 
-def build_full_context_markdown(summary: Dict[str, Any], settings: Settings, verbose: bool = False) -> str:
+def build_full_context_markdown(
+    summary: Dict[str, Any],
+    settings: Settings,
+    verbose: bool = False,
+    on_progress: ProgressFn = None,
+) -> str:
     """Build a FULL context (Markdown) from the oneshot_summary via multiple agents."""
 
     llm = LLMClient(settings)
 
-    if verbose:
-        logger.info("Running capabilities agent...")
+    def notify(msg: str) -> None:
+        if on_progress:
+            on_progress(msg)
+        if verbose:
+            logger.info(msg)
+
+    notify("Running capabilities agent...")
     capabilities = run_capabilities_agent(llm, summary, verbose=verbose)
 
-    if verbose:
-        logger.info("Running structure agent...")
+    notify("Running structure agent...")
     structure = run_structure_agent(llm, summary, verbose=verbose)
 
-    if verbose:
-        logger.info("Running obfuscation agent...")
+    notify("Running obfuscation agent...")
     obfuscation = run_obfuscation_agent(llm, summary, verbose=verbose)
 
-    if verbose:
-        logger.info("Running classification agent...")
+    notify("Running classification agent...")
     classification = run_classification_agent(
         llm,
         summary=summary,
@@ -516,8 +537,7 @@ def build_full_context_markdown(summary: Dict[str, Any], settings: Settings, ver
         verbose=verbose,
     )
 
-    if verbose:
-        logger.info("Running context synthesis agent...")
+    notify("Running context synthesis agent...")
     markdown = run_context_synth_agent(
         llm,
         summary=summary,
@@ -530,7 +550,13 @@ def build_full_context_markdown(summary: Dict[str, Any], settings: Settings, ver
     return markdown
 
 
-def ensure_context(snapshot_dir: Path, settings: Settings, level: str = "basic", verbose: bool = False) -> Path:
+def ensure_context(
+    snapshot_dir: Path,
+    settings: Settings,
+    level: str = "basic",
+    verbose: bool = False,
+    on_progress: ProgressFn = None,
+) -> Path:
     """Ensure that BINARY_CONTEXT.md exists at the requested level."""
 
     requested = (level or "basic").strip().lower()
@@ -538,11 +564,15 @@ def ensure_context(snapshot_dir: Path, settings: Settings, level: str = "basic",
         raise ValueError("level must be 'basic' or 'full'")
 
     context_path = snapshot_dir / "BINARY_CONTEXT.md"
-    current_level = detect_context_level(context_path) if context_path.exists() else "none"
+    current_level = (
+        detect_context_level(context_path) if context_path.exists() else "none"
+    )
 
     if current_level == "full" or (current_level == "basic" and requested == "basic"):
         if verbose:
-            logger.info("Context already present at level '%s': %s", current_level, context_path)
+            logger.info(
+                "Context already present at level '%s': %s", current_level, context_path
+            )
         return context_path
 
     summary = ensure_oneshot_summary(snapshot_dir, verbose=verbose)
@@ -551,7 +581,12 @@ def ensure_context(snapshot_dir: Path, settings: Settings, level: str = "basic",
         markdown = build_basic_context_markdown(summary, settings, verbose=verbose)
         write_context_file(context_path, markdown, level="basic")
     else:
-        markdown = build_full_context_markdown(summary, settings, verbose=verbose)
+        markdown = build_full_context_markdown(
+            summary,
+            settings,
+            verbose=verbose,
+            on_progress=on_progress,
+        )
         write_context_file(context_path, markdown, level="full")
 
     if verbose:

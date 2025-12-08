@@ -53,7 +53,10 @@ def test_agent_runs_tool_loop():
                 "type": "function",
                 "function": {
                     "name": "echo_tool",
-                    "parameters": {"type": "object", "properties": {"text": {"type": "string"}}},
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"text": {"type": "string"}},
+                    },
                 },
             }
         ],
@@ -88,7 +91,7 @@ def test_agent_preserves_conversation_history():
 
     # Second turn
     llm.invocations = 0  # Reset for second question
-    answer2 = agent.run("second question")
+    agent.run("second question")
 
     # History should now have 5 messages (system + 2 Q&A pairs)
     assert len(agent.messages) == 5

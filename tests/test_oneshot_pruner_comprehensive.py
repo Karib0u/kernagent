@@ -397,9 +397,20 @@ class TestSectionAnalysis:
 
     def test_section_permission_string(self):
         """Section permissions should be formatted correctly."""
-        assert _section_permission_string({"read": True, "write": True, "execute": True}) == "rwx"
-        assert _section_permission_string({"read": True, "write": False, "execute": True}) == "r-x"
-        assert _section_permission_string({"read": False, "write": False, "execute": False}) == "---"
+        assert (
+            _section_permission_string({"read": True, "write": True, "execute": True})
+            == "rwx"
+        )
+        assert (
+            _section_permission_string({"read": True, "write": False, "execute": True})
+            == "r-x"
+        )
+        assert (
+            _section_permission_string(
+                {"read": False, "write": False, "execute": False}
+            )
+            == "---"
+        )
 
 
 class TestSuspicionSignals:

@@ -1,10 +1,8 @@
 """Comprehensive tests for configuration loading."""
 
-import os
 from pathlib import Path
 from unittest import mock
 
-import pytest
 
 from kernagent.config import Settings, load_settings
 
@@ -68,8 +66,10 @@ class TestLoadSettings:
     def test_load_settings_calls_dotenv_if_available(self):
         """load_settings should call load_dotenv if available."""
         mock_load_dotenv = mock.Mock()
-        with mock.patch("kernagent.config.load_dotenv", mock_load_dotenv), \
-             mock.patch("os.path.exists", return_value=True):
+        with (
+            mock.patch("kernagent.config.load_dotenv", mock_load_dotenv),
+            mock.patch("os.path.exists", return_value=True),
+        ):
             settings = load_settings()
             mock_load_dotenv.assert_called_once()
             assert isinstance(settings, Settings)
@@ -79,8 +79,10 @@ class TestLoadSettings:
         config_path = "/tmp/custom/config.env"
         mock_load_dotenv = mock.Mock()
         monkeypatch.setenv("KERNAGENT_CONFIG", config_path)
-        with mock.patch("kernagent.config.load_dotenv", mock_load_dotenv), \
-             mock.patch("os.path.exists", return_value=True):
+        with (
+            mock.patch("kernagent.config.load_dotenv", mock_load_dotenv),
+            mock.patch("os.path.exists", return_value=True),
+        ):
             load_settings()
         mock_load_dotenv.assert_called_once_with(config_path)
 
@@ -91,8 +93,10 @@ class TestLoadSettings:
         monkeypatch.setenv("XDG_CONFIG_HOME", config_home)
         mock_load_dotenv = mock.Mock()
         expected_path = str(Path(config_home) / "kernagent" / "config.env")
-        with mock.patch("kernagent.config.load_dotenv", mock_load_dotenv), \
-             mock.patch("os.path.exists", return_value=True):
+        with (
+            mock.patch("kernagent.config.load_dotenv", mock_load_dotenv),
+            mock.patch("os.path.exists", return_value=True),
+        ):
             load_settings()
         mock_load_dotenv.assert_called_once_with(expected_path)
 

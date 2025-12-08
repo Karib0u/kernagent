@@ -92,7 +92,7 @@ class ReverseEngineeringAgent:
                 logger.info(
                     "LLM response: content=%r, tool_calls=%s",
                     message.content[:100] if message.content else None,
-                    len(message.tool_calls) if message.tool_calls else 0
+                    len(message.tool_calls) if message.tool_calls else 0,
                 )
 
             message_dict = {"role": message.role, "content": message.content}
@@ -139,11 +139,15 @@ class ReverseEngineeringAgent:
                         result = handler(**args)
                         if verbose:
                             logger.info("Tool %s: SUCCESS", func_name)
-                    except Exception as exc:  # pragma: no cover - depends on tool inputs
+                    except (
+                        Exception
+                    ) as exc:  # pragma: no cover - depends on tool inputs
                         logger.exception("Tool %s failed", func_name)
                         result = {"error": str(exc)}
                         if verbose:
-                            logger.info("Tool %s: ERROR (%s)", func_name, type(exc).__name__)
+                            logger.info(
+                                "Tool %s: ERROR (%s)", func_name, type(exc).__name__
+                            )
 
                 working_messages.append(
                     {
@@ -166,7 +170,9 @@ class ReverseEngineeringAgent:
                 messages=working_messages,
                 temperature=0.1,
             )
-            final_content = final_response.choices[0].message.content or "No summary generated"
+            final_content = (
+                final_response.choices[0].message.content or "No summary generated"
+            )
             # Persist only user question and final answer to history
             self.messages.append({"role": "user", "content": question})
             self.messages.append({"role": "assistant", "content": final_content})
@@ -175,7 +181,9 @@ class ReverseEngineeringAgent:
             logger.error("Final summary request failed: %s", exc)
             return f"Max iterations reached. Error getting summary: {exc}"
 
-    def run_stream(self, question: str, verbose: bool = False) -> Generator[AgentEvent, None, str]:
+    def run_stream(
+        self, question: str, verbose: bool = False
+    ) -> Generator[AgentEvent, None, str]:
         """Run the agent and yield events for UI updates."""
         # Working messages includes history + current question + tool loop
         # Only user question and final answer are persisted to self.messages
@@ -183,7 +191,9 @@ class ReverseEngineeringAgent:
 
         for iteration in range(self.max_iterations):
             # Yield thinking event
-            yield ThinkingEvent(iteration=iteration + 1, max_iterations=self.max_iterations)
+            yield ThinkingEvent(
+                iteration=iteration + 1, max_iterations=self.max_iterations
+            )
 
             try:
                 response = self.llm.chat(
@@ -234,32 +244,23 @@ class ReverseEngineeringAgent:
 
                 # Yield tool call event
                 yield ToolCallEvent(
-                    tool_name=func_name,
-                    arguments=args,
-                    tool_call_id=tool_call.id
+                    tool_name=func_name, arguments=args, tool_call_id=tool_call.id
                 )
 
                 if not handler:
                     result = {"error": f"Unknown tool: {func_name}"}
                     yield ToolResultEvent(
-                        tool_name=func_name,
-                        success=False,
-                        error="Unknown tool"
+                        tool_name=func_name, success=False, error="Unknown tool"
                     )
                 else:
                     try:
                         result = handler(**args)
-                        yield ToolResultEvent(
-                            tool_name=func_name,
-                            success=True
-                        )
+                        yield ToolResultEvent(tool_name=func_name, success=True)
                     except Exception as exc:
                         logger.exception("Tool %s failed", func_name)
                         result = {"error": str(exc)}
                         yield ToolResultEvent(
-                            tool_name=func_name,
-                            success=False,
-                            error=str(exc)
+                            tool_name=func_name, success=False, error=str(exc)
                         )
 
                 working_messages.append(
@@ -286,7 +287,9 @@ class ReverseEngineeringAgent:
                 messages=working_messages,
                 temperature=0.1,
             )
-            final_content = final_response.choices[0].message.content or "No summary generated"
+            final_content = (
+                final_response.choices[0].message.content or "No summary generated"
+            )
             # Persist only user question and final answer to history
             self.messages.append({"role": "user", "content": question})
             self.messages.append({"role": "assistant", "content": final_content})

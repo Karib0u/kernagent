@@ -6,7 +6,6 @@ import argparse
 import json
 import os
 import shutil
-import sys
 from pathlib import Path
 
 import httpx
@@ -58,6 +57,7 @@ def _get_config_path() -> Path:
 def _convert_localhost_for_docker(url: str) -> str:
     """Convert localhost URLs to host.docker.internal for Docker containers."""
     import re
+
     # Match localhost, 127.0.0.1, or 0.0.0.0
     pattern = r"(https?://)(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?"
     return re.sub(pattern, r"\1host.docker.internal\2", url)
@@ -73,7 +73,9 @@ def _fetch_models(base_url: str, api_key: str) -> list[str]:
             data = resp.json()
             # Handle both {data: [...]} and {models: [...]} formats
             models = data.get("data") or data.get("models") or []
-            return [m.get("id", m.get("name", "")) for m in models if isinstance(m, dict)]
+            return [
+                m.get("id", m.get("name", "")) for m in models if isinstance(m, dict)
+            ]
     except Exception:
         return []
 
@@ -141,10 +143,11 @@ def ensure_snapshot(binary_path: Path, verbose: bool = False) -> Path:
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser with 4 commands."""
     parser = argparse.ArgumentParser(
-        prog="kernagent",
-        description="Static binary analysis assistant."
+        prog="kernagent", description="Static binary analysis assistant."
     )
-    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging.")
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Enable verbose logging."
+    )
     parser.add_argument("--model", type=str, help="Override the LLM model.")
     parser.add_argument("--base-url", type=str, help="Override the API base URL.")
     parser.add_argument("--api-key", type=str, help="Override the API key.")
@@ -192,23 +195,37 @@ def run_init() -> None:
     console = Console()
 
     # Display welcome banner
-    console.print(Panel.fit(
-        KERNAGENT_BANNER + "\n[dim]Static Binary Analysis Assistant[/dim]",
-        border_style="blue",
-        padding=(1, 2)
-    ))
-    console.print("\n[bold cyan]Welcome![/bold cyan] Let's configure your LLM provider.\n")
+    console.print(
+        Panel.fit(
+            KERNAGENT_BANNER + "\n[dim]Static Binary Analysis Assistant[/dim]",
+            border_style="blue",
+            padding=(1, 2),
+        )
+    )
+    console.print(
+        "\n[bold cyan]Welcome![/bold cyan] Let's configure your LLM provider.\n"
+    )
 
     providers = {
         "1": ("OpenAI", "https://api.openai.com/v1", "gpt-4o"),
-        "2": ("Google (Gemini)", "https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-1.5-pro"),
-        "3": ("Anthropic", "https://api.anthropic.com/v1/", "claude-3-5-sonnet-20241022"),
+        "2": (
+            "Google (Gemini)",
+            "https://generativelanguage.googleapis.com/v1beta/openai/",
+            "gemini-1.5-pro",
+        ),
+        "3": (
+            "Anthropic",
+            "https://api.anthropic.com/v1/",
+            "claude-3-5-sonnet-20241022",
+        ),
         "4": ("Local (Ollama/LM Studio)", "http://host.docker.internal:1234/v1", ""),
         "5": ("Custom endpoint", "", ""),
     }
 
     # Display providers in a table
-    table = Table(title="Available LLM Providers", show_header=True, header_style="bold magenta")
+    table = Table(
+        title="Available LLM Providers", show_header=True, header_style="bold magenta"
+    )
     table.add_column("Choice", style="cyan", width=8)
     table.add_column("Provider", style="green")
     table.add_column("Endpoint", style="dim")
@@ -218,7 +235,9 @@ def run_init() -> None:
 
     console.print(table)
 
-    choice = Prompt.ask("\n[bold]Select provider[/bold]", default="1", choices=list(providers.keys()))
+    choice = Prompt.ask(
+        "\n[bold]Select provider[/bold]", default="1", choices=list(providers.keys())
+    )
 
     name, default_url, default_model = providers[choice]
     console.print(f"\n[bold blue]━━━ {name} Configuration ━━━[/bold blue]\n")
@@ -240,7 +259,9 @@ def run_init() -> None:
         api_key = "not-needed"
         console.print("[dim]Skipping API key for local provider[/dim]")
     else:  # Custom endpoint - optional
-        api_key = Prompt.ask("[cyan]API Key[/cyan] (optional)", default="not-needed", password=True)
+        api_key = Prompt.ask(
+            "[cyan]API Key[/cyan] (optional)", default="not-needed", password=True
+        )
 
     console.print("[green]✓[/green] Provider configured")
 
@@ -271,14 +292,18 @@ def run_init() -> None:
             console.print(model_table)
 
             # Get model choice
-            choice_str = Prompt.ask("\n[bold]Select model number or type custom[/bold]", default="1")
+            choice_str = Prompt.ask(
+                "\n[bold]Select model number or type custom[/bold]", default="1"
+            )
             if choice_str.isdigit() and 1 <= int(choice_str) <= len(models):
                 model = models[int(choice_str) - 1]
             else:
                 model = choice_str
     else:
         if choice in ("1", "2", "3"):
-            console.print("[yellow]⚠[/yellow]  Could not fetch models (check API key or endpoint)")
+            console.print(
+                "[yellow]⚠[/yellow]  Could not fetch models (check API key or endpoint)"
+            )
         if default_model:
             model = Prompt.ask("[cyan]Model name[/cyan]", default=default_model)
         else:
@@ -302,17 +327,21 @@ def run_init() -> None:
 
     # Success message
     console.print("\n" + "─" * 60)
-    console.print(Panel.fit(
-        f"[green]✓ Configuration Complete![/green]\n\n"
-        f"[cyan]Provider:[/cyan] {name}\n"
-        f"[cyan]Model:[/cyan]    {model}\n"
-        f"[cyan]Config:[/cyan]   {config_path}",
-        border_style="green",
-        padding=(1, 2)
-    ))
+    console.print(
+        Panel.fit(
+            f"[green]✓ Configuration Complete![/green]\n\n"
+            f"[cyan]Provider:[/cyan] {name}\n"
+            f"[cyan]Model:[/cyan]    {model}\n"
+            f"[cyan]Config:[/cyan]   {config_path}",
+            border_style="green",
+            padding=(1, 2),
+        )
+    )
     console.print("─" * 60)
 
-    console.print("\n[bold green]You're ready to go![/bold green] Try these commands:\n")
+    console.print(
+        "\n[bold green]You're ready to go![/bold green] Try these commands:\n"
+    )
     console.print("  [cyan]kernagent analyze[/cyan] [dim]<binary>[/dim]")
     console.print("  [cyan]kernagent chat[/cyan] [dim]<binary>[/dim]\n")
 
@@ -335,11 +364,17 @@ def run_analyze(
     snapshot_dir = _snapshot_dir_for(binary_path)
 
     # Suppress verbose output unless verbose flag is set
-    output_suppressor = contextlib.redirect_stdout(io.StringIO()) if not verbose else contextlib.nullcontext()
+    output_suppressor = (
+        contextlib.redirect_stdout(io.StringIO())
+        if not verbose
+        else contextlib.nullcontext()
+    )
 
     # Step 1: Snapshot
     if not snapshot_dir.exists():
-        with console.status("[bold blue]Extracting binary artifacts via Ghidra...", spinner="dots"):
+        with console.status(
+            "[bold blue]Extracting binary artifacts via Ghidra...", spinner="dots"
+        ):
             with output_suppressor:
                 snapshot_dir = build_snapshot(binary_path, verbose=verbose)
         console.print("[green]✓[/green] Snapshot extracted")
@@ -348,12 +383,18 @@ def run_analyze(
 
     # Step 2: Context
     context_level = "full" if full else "basic"
-    with console.status(f"[bold blue]Preparing {context_level} analysis context...", spinner="dots"):
+    with console.status(
+        f"[bold blue]Preparing {context_level} analysis context...", spinner="dots"
+    ):
         with output_suppressor:
-            context_path = ensure_context(snapshot_dir, settings, level=context_level, verbose=verbose)
+            context_path = ensure_context(
+                snapshot_dir, settings, level=context_level, verbose=verbose
+            )
             context_text = context_path.read_text(encoding="utf-8")
             summary = ensure_oneshot_summary(snapshot_dir, verbose=verbose)
-    console.print(f"[green]✓[/green] Context prepared ({len(context_text):,} characters)")
+    console.print(
+        f"[green]✓[/green] Context prepared ({len(context_text):,} characters)"
+    )
 
     # Step 3: Analysis
     console.print(f"[bold blue]Analyzing {binary_path.name}...[/bold blue]")
@@ -369,7 +410,6 @@ def run_analyze(
     from rich.markdown import Markdown
     from rich.live import Live
     from rich.spinner import Spinner
-    from rich.columns import Columns
 
     console.print(f"[bold cyan]Analysis for {binary_path.name}:[/bold cyan]")
 
@@ -385,7 +425,8 @@ def run_analyze(
                 {"role": "system", "content": ANALYZE_SYSTEM_PROMPT},
                 {
                     "role": "system",
-                    "content": "Pre-analysis context for this binary (BINARY_CONTEXT.md):\n\n" + context_text,
+                    "content": "Pre-analysis context for this binary (BINARY_CONTEXT.md):\n\n"
+                    + context_text,
                 },
                 {"role": "user", "content": payload},
             ],
@@ -397,7 +438,9 @@ def run_analyze(
 
     # Add finishing touches
     console.print(Rule(style="dim"))
-    console.print(f"[dim]Analysis completed at {datetime.now().strftime('%H:%M:%S')}[/dim]")
+    console.print(
+        f"[dim]Analysis completed at {datetime.now().strftime('%H:%M:%S')}[/dim]"
+    )
     console.print(f"[dim]Context saved to: {context_path}[/dim]\n")
 
 
@@ -421,11 +464,17 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
     snapshot_dir = _snapshot_dir_for(binary_path)
 
     # Suppress verbose output unless verbose flag is set
-    output_suppressor = contextlib.redirect_stdout(io.StringIO()) if not verbose else contextlib.nullcontext()
+    output_suppressor = (
+        contextlib.redirect_stdout(io.StringIO())
+        if not verbose
+        else contextlib.nullcontext()
+    )
 
     # Step 1: Snapshot
     if not snapshot_dir.exists():
-        with console.status("[bold blue]Extracting binary artifacts via Ghidra...", spinner="dots"):
+        with console.status(
+            "[bold blue]Extracting binary artifacts via Ghidra...", spinner="dots"
+        ):
             with output_suppressor:
                 snapshot_dir = build_snapshot(binary_path, verbose=verbose)
         console.print("[green]✓[/green] Snapshot extracted")
@@ -435,7 +484,9 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
     # Step 2: Context
     with console.status("[bold blue]Preparing analysis context...", spinner="dots"):
         with output_suppressor:
-            context_path = ensure_context(snapshot_dir, settings, level="basic", verbose=verbose)
+            context_path = ensure_context(
+                snapshot_dir, settings, level="basic", verbose=verbose
+            )
             context_text = context_path.read_text(encoding="utf-8")
     console.print(f"[green]✓[/green] Context ready ({len(context_text):,} characters)")
 
@@ -449,7 +500,8 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
             1,
             {
                 "role": "system",
-                "content": "Pre-analysis context for this specific binary:\n\n" + context_text,
+                "content": "Pre-analysis context for this specific binary:\n\n"
+                + context_text,
             },
         )
         return base_agent
@@ -457,12 +509,14 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
     agent = _make_agent()
 
     # Display welcome banner
-    console.print(Panel.fit(
-        f"[bold cyan]Chat session for {binary_path.name}[/bold cyan]\n\n"
-        f"[dim]Type 'exit', 'quit', or Ctrl+D to exit\n"
-        f"Type 'clear' to reset conversation[/dim]",
-        border_style="cyan"
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold cyan]Chat session for {binary_path.name}[/bold cyan]\n\n"
+            f"[dim]Type 'exit', 'quit', or Ctrl+D to exit\n"
+            f"Type 'clear' to reset conversation[/dim]",
+            border_style="cyan",
+        )
+    )
     console.print()
 
     while True:
@@ -491,13 +545,20 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
                 for event in agent.run_stream(user_input, verbose=verbose):
                     if isinstance(event, ThinkingEvent):
                         # Show spinner while thinking
-                        live.update(Spinner("dots", text=f"[dim]Thinking... (step {event.iteration}/{event.max_iterations})[/dim]"))
+                        live.update(
+                            Spinner(
+                                "dots",
+                                text=f"[dim]Thinking... (step {event.iteration}/{event.max_iterations})[/dim]",
+                            )
+                        )
 
                     elif isinstance(event, ToolCallEvent):
                         # Show tool call immediately (not in live display)
                         live.stop()
                         # Format tool arguments for display
-                        args_str = ", ".join(f"{k}={v!r}" for k, v in list(event.arguments.items())[:2])
+                        args_str = ", ".join(
+                            f"{k}={v!r}" for k, v in list(event.arguments.items())[:2]
+                        )
                         if len(event.arguments) > 2:
                             args_str += ", ..."
                         console.print(f"[dim]  → {event.tool_name}({args_str})[/dim]")
@@ -508,12 +569,16 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
                         if event.success:
                             console.print("[dim]    [green]✓[/green] Done[/dim]")
                         else:
-                            console.print(f"[dim]    [red]✗[/red] Error: {event.error}[/dim]")
+                            console.print(
+                                f"[dim]    [red]✗[/red] Error: {event.error}[/dim]"
+                            )
                         live.start()
 
                     elif isinstance(event, MaxIterationsEvent):
                         live.stop()
-                        console.print("[yellow]⚠[/yellow]  Max iterations reached, generating summary...")
+                        console.print(
+                            "[yellow]⚠[/yellow]  Max iterations reached, generating summary..."
+                        )
                         live.start()
 
                     elif isinstance(event, MessageEvent):
@@ -522,6 +587,7 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
                             live.stop()
                             # Display the final answer
                             from rich.markdown import Markdown
+
                             console.print("\n[bold magenta]Assistant:[/bold magenta]")
                             console.print(Markdown(event.content))
                             console.print()
@@ -535,7 +601,9 @@ def run_chat(binary_path: Path, settings: Settings, verbose: bool) -> None:
             console.print(f"\n[red]Error:[/red] {exc}\n")
 
 
-def run_snapshot(binary_path: Path | None, list_mode: bool, force: bool, verbose: bool) -> None:
+def run_snapshot(
+    binary_path: Path | None, list_mode: bool, force: bool, verbose: bool
+) -> None:
     """Snapshot management."""
     from rich.console import Console
     from rich.table import Table
@@ -560,7 +628,9 @@ def run_snapshot(binary_path: Path | None, list_mode: bool, force: bool, verbose
             return
 
         # Display snapshots in a table
-        table = Table(title="Available Snapshots", show_header=True, header_style="bold cyan")
+        table = Table(
+            title="Available Snapshots", show_header=True, header_style="bold cyan"
+        )
         table.add_column("Snapshot", style="green")
         table.add_column("Path", style="dim")
 
@@ -581,26 +651,32 @@ def run_snapshot(binary_path: Path | None, list_mode: bool, force: bool, verbose
     snapshot_dir = _snapshot_dir_for(binary_path)
 
     if snapshot_dir.exists() and not force:
-        console.print(Panel.fit(
-            f"[yellow]Snapshot already exists[/yellow]\n\n"
-            f"[dim]Path:[/dim] {snapshot_dir}\n\n"
-            f"[dim]Use[/dim] [cyan]--force[/cyan] [dim]to rebuild[/dim]",
-            border_style="yellow"
-        ))
+        console.print(
+            Panel.fit(
+                f"[yellow]Snapshot already exists[/yellow]\n\n"
+                f"[dim]Path:[/dim] {snapshot_dir}\n\n"
+                f"[dim]Use[/dim] [cyan]--force[/cyan] [dim]to rebuild[/dim]",
+                border_style="yellow",
+            )
+        )
         return
 
     if snapshot_dir.exists() and force:
         console.print("[yellow]⚠[/yellow]  Removing existing snapshot...")
         shutil.rmtree(snapshot_dir)
 
-    with console.status(f"[bold blue]Building snapshot for {binary_path.name}...", spinner="dots"):
+    with console.status(
+        f"[bold blue]Building snapshot for {binary_path.name}...", spinner="dots"
+    ):
         result = build_snapshot(binary_path, verbose=verbose)
 
-    console.print(Panel.fit(
-        f"[green]✓ Snapshot created successfully![/green]\n\n"
-        f"[dim]Path:[/dim] {result}",
-        border_style="green"
-    ))
+    console.print(
+        Panel.fit(
+            f"[green]✓ Snapshot created successfully![/green]\n\n"
+            f"[dim]Path:[/dim] {result}",
+            border_style="green",
+        )
+    )
 
 
 # ============================================================================

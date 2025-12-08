@@ -122,20 +122,17 @@ class BinaryArchiveExtractor:
         """
         try:
             body = function.getBody()
-            size = sum(
-                r.getMaxAddress().subtract(r.getMinAddress()) + 1
-                for r in body
-            )
+            size = sum(r.getMaxAddress().subtract(r.getMinAddress()) + 1 for r in body)
 
-            if size < 100:       # Tiny function (<100 bytes)
+            if size < 100:  # Tiny function (<100 bytes)
                 return 5
-            elif size < 500:     # Small function
+            elif size < 500:  # Small function
                 return 10
-            elif size < 2000:    # Medium function
+            elif size < 2000:  # Medium function
                 return 20
-            elif size < 10000:   # Large function
+            elif size < 10000:  # Large function
                 return 45
-            else:                # Very large function
+            else:  # Very large function
                 return 60
 
         except Exception:
@@ -210,8 +207,8 @@ class BinaryArchiveExtractor:
         """
         self.log("Building cross-reference maps...")
 
-        callers = {}   # ea -> list of caller eas
-        callees = {}   # ea -> list of callee dicts
+        callers = {}  # ea -> list of caller eas
+        callees = {}  # ea -> list of callee dicts
 
         func_mgr = program.getFunctionManager()
         ref_mgr = program.getReferenceManager()
@@ -244,11 +241,13 @@ class BinaryArchiveExtractor:
                             callee_ea = str(to_addr)
                             if callee_ea not in seen_callees:
                                 seen_callees.add(callee_ea)
-                                callees[ea].append({
-                                    "ea": callee_ea,
-                                    "name": callee.getName(),
-                                    "type": str(ref_type)
-                                })
+                                callees[ea].append(
+                                    {
+                                        "ea": callee_ea,
+                                        "name": callee.getName(),
+                                        "type": str(ref_type),
+                                    }
+                                )
 
         return callers, callees
 
@@ -319,44 +318,48 @@ class BinaryArchiveExtractor:
         except TypeError:
             mgr.waitForAnalysis(monitor)
 
-    def sanitize_filename(self, func_name: str, address: str, max_length: int = 200) -> str:
+    def sanitize_filename(
+        self, func_name: str, address: str, max_length: int = 200
+    ) -> str:
         """
         Create a safe filename from function name and address.
-        
+
         Args:
             func_name: The function name (may be very long due to C++ mangling)
             address: The function address (unique identifier)
             max_length: Maximum filename length (excluding extension)
-        
+
         Returns:
             A safe filename string
         """
         # Remove or replace problematic characters
-        safe_name = func_name.replace(':', '_').replace('<', '_').replace('>', '_')
-        safe_name = safe_name.replace('*', '_').replace('?', '_').replace('"', '_')
-        safe_name = safe_name.replace('|', '_').replace('/', '_').replace('\\', '_')
-        
+        safe_name = func_name.replace(":", "_").replace("<", "_").replace(">", "_")
+        safe_name = safe_name.replace("*", "_").replace("?", "_").replace('"', "_")
+        safe_name = safe_name.replace("|", "_").replace("/", "_").replace("\\", "_")
+
         # Clean up the address (remove 0x prefix if present and any colons)
-        clean_addr = address.replace('0x', '').replace(':', '')
-        
+        clean_addr = address.replace("0x", "").replace(":", "")
+
         # If the name is short enough, use it directly with address
         # Reserve space for address, underscore, and extension (.c = 2 chars)
         addr_length = len(clean_addr)
         available_for_name = max_length - addr_length - 1  # -1 for underscore
-        
+
         if len(safe_name) <= available_for_name:
             return f"{clean_addr}_{safe_name}.c"
-        
+
         # Name is too long - truncate and add hash to ensure uniqueness
-        truncate_length = available_for_name - 9  # Reserve 8 chars for hash + underscore
+        truncate_length = (
+            available_for_name - 9
+        )  # Reserve 8 chars for hash + underscore
         if truncate_length < 10:
             truncate_length = 10
-        
+
         truncated_name = safe_name[:truncate_length]
-        
+
         # Create a short hash of the full name for uniqueness
         name_hash = hashlib.md5(func_name.encode()).hexdigest()[:8]
-        
+
         return f"{clean_addr}_{truncated_name}_{name_hash}.c"
 
     def calculate_hashes(self) -> Dict[str, str]:
@@ -429,7 +432,7 @@ class BinaryArchiveExtractor:
             for i in range(num_bytes):
                 byte = program.getMemory().getByte(addr.add(i))
                 instr_bytes.append(byte & 0xFF)
-        except:
+        except Exception:
             pass
 
         bytes_hex = "".join(f"{b:02x}" for b in instr_bytes)
@@ -453,7 +456,7 @@ class BinaryArchiveExtractor:
     def get_xrefs_to_function(self, function, program) -> List[str]:
         """Get cached cross-references TO this function (callers)"""
         ea = str(function.getEntryPoint())
-        if hasattr(self, 'callers_map') and ea in self.callers_map:
+        if hasattr(self, "callers_map") and ea in self.callers_map:
             return self.callers_map[ea]
 
         # Fallback to original implementation if maps not built
@@ -476,7 +479,7 @@ class BinaryArchiveExtractor:
     def get_xrefs_from_function(self, function, program) -> List[Dict[str, str]]:
         """Get cached cross-references FROM this function (callees)"""
         ea = str(function.getEntryPoint())
-        if hasattr(self, 'callees_map') and ea in self.callees_map:
+        if hasattr(self, "callees_map") and ea in self.callees_map:
             return self.callees_map[ea]
 
         # Fallback to original implementation if maps not built
@@ -513,10 +516,11 @@ class BinaryArchiveExtractor:
 
         try:
             # Use cached BasicBlockModel if available
-            if hasattr(self, 'bbm') and self.bbm:
+            if hasattr(self, "bbm") and self.bbm:
                 bbm = self.bbm
             else:
                 from ghidra.program.model.block import BasicBlockModel
+
                 bbm = BasicBlockModel(program)
 
             # Get function body address set
@@ -645,14 +649,18 @@ class BinaryArchiveExtractor:
             func_data["bytes_concat"] = "".join(all_bytes)
         except Exception as exc:
             func_data["bytes_concat"] = ""
-            logger.warning("Could not extract function bytes for %s: %s", function.getName(), exc)
+            logger.warning(
+                "Could not extract function bytes for %s: %s", function.getName(), exc
+            )
 
         # Metrics (inline to avoid extra passes)
         metrics: Dict[str, Any] = {}
         body = function.getBody()
         total_size = 0
         for addr_range in body:
-            total_size += addr_range.getMaxAddress().subtract(addr_range.getMinAddress()) + 1
+            total_size += (
+                addr_range.getMaxAddress().subtract(addr_range.getMinAddress()) + 1
+            )
         metrics["size_bytes"] = total_size
         metrics["instruction_count"] = len(instructions)
 
@@ -673,18 +681,26 @@ class BinaryArchiveExtractor:
                     if body.contains(dest.getDestinationAddress()):
                         edge_count += 1
             metrics["basic_block_count"] = bb_count
-            metrics["cyclomatic_complexity"] = max(1, edge_count - bb_count + 2) if bb_count else 1
+            metrics["cyclomatic_complexity"] = (
+                max(1, edge_count - bb_count + 2) if bb_count else 1
+            )
         except Exception as exc:
             metrics["basic_block_count"] = bb_count
             metrics["cyclomatic_complexity"] = 1
-            logger.debug("Basic block metrics failed for %s: %s", function.getName(), exc)
+            logger.debug(
+                "Basic block metrics failed for %s: %s", function.getName(), exc
+            )
 
         if hasattr(self, "callers_map"):
             metrics["callers_count"] = len(self.callers_map.get(ea_str, []))
             metrics["callees_count"] = len(self.callees_map.get(ea_str, []))
         else:
-            metrics["callers_count"] = len(self.get_xrefs_to_function(function, program))
-            metrics["callees_count"] = len(self.get_xrefs_from_function(function, program))
+            metrics["callers_count"] = len(
+                self.get_xrefs_to_function(function, program)
+            )
+            metrics["callees_count"] = len(
+                self.get_xrefs_from_function(function, program)
+            )
 
         func_data["metrics"] = metrics
 
@@ -702,7 +718,9 @@ class BinaryArchiveExtractor:
                         }
                     )
         except Exception as exc:
-            logger.debug("Failed to enumerate basic blocks for %s: %s", function.getName(), exc)
+            logger.debug(
+                "Failed to enumerate basic blocks for %s: %s", function.getName(), exc
+            )
         func_data["bb"] = basic_blocks
 
         # Comments
@@ -729,7 +747,6 @@ class BinaryArchiveExtractor:
 
         return func_data, decomp_filename, decomp_code
 
-
     def extract_strings(self, program) -> List[Dict[str, Any]]:
         """Extract all defined strings with their cross-references"""
         self.log("Extracting strings...")
@@ -751,7 +768,7 @@ class BinaryArchiveExtractor:
                 # Get string value
                 try:
                     value = str(string_data.getValue())
-                except:
+                except Exception:
                     value = ""
 
                 # Get cross-references to this string
@@ -890,10 +907,11 @@ class BinaryArchiveExtractor:
         """Calculate cyclomatic complexity for a function"""
         try:
             # Use cached BasicBlockModel if available
-            if hasattr(self, 'bbm') and self.bbm:
+            if hasattr(self, "bbm") and self.bbm:
                 bbm = self.bbm
             else:
                 from ghidra.program.model.block import BasicBlockModel
+
                 bbm = BasicBlockModel(program)
 
             func_body = function.getBody()
@@ -925,7 +943,7 @@ class BinaryArchiveExtractor:
             else:
                 return 1
 
-        except Exception as e:
+        except Exception:
             return 0
 
     def extract_function_metrics(self, function, program, monitor) -> Dict[str, Any]:
@@ -974,7 +992,7 @@ class BinaryArchiveExtractor:
 
             # Count incoming and outgoing calls (use cached maps if available)
             ea = str(function.getEntryPoint())
-            if hasattr(self, 'callers_map'):
+            if hasattr(self, "callers_map"):
                 metrics["callers_count"] = len(self.callers_map.get(ea, []))
                 metrics["callees_count"] = len(self.callees_map.get(ea, []))
             else:
@@ -1115,7 +1133,7 @@ class BinaryArchiveExtractor:
                             value = data.getValue()
                             if value is not None:
                                 data_info["value"] = str(value)
-                        except:
+                        except Exception:
                             pass
 
                         data_list.append(data_info)
@@ -1130,7 +1148,9 @@ class BinaryArchiveExtractor:
         if self.verbose:
             logger.info("Starting snapshot extraction for %s", self.binary_path)
         else:
-            console.print(f"[bold cyan]Starting snapshot extraction:[/] {self.binary_path.name}")
+            console.print(
+                f"[bold cyan]Starting snapshot extraction:[/] {self.binary_path.name}"
+            )
 
         self.output_dir.mkdir(exist_ok=True)
         decomp_dir = self.output_dir / "decomp"
@@ -1152,10 +1172,14 @@ class BinaryArchiveExtractor:
 
                 # Build xref maps once
                 with self.status("Building cross-reference maps..."):
-                    self.callers_map, self.callees_map = self._build_xref_maps(program, monitor)
+                    self.callers_map, self.callees_map = self._build_xref_maps(
+                        program, monitor
+                    )
                 if not self.verbose:
                     total_refs = sum(len(v) for v in self.callers_map.values())
-                    console.print(f"[green]✓[/] Built xref maps ([bold]{total_refs}[/bold] references)")
+                    console.print(
+                        f"[green]✓[/] Built xref maps ([bold]{total_refs}[/bold] references)"
+                    )
 
                 # Phase 2: Extract metadata
                 with self.status("Extracting metadata..."):
@@ -1163,16 +1187,22 @@ class BinaryArchiveExtractor:
                     with open(meta_path, "w", encoding="utf-8") as f:
                         json.dump(metadata, f, indent=2)
                 if not self.verbose:
-                    console.print(f"[green]✓[/] Binary metadata extracted ([dim]{metadata.get('executable_format', 'unknown')}[/dim])")
+                    console.print(
+                        f"[green]✓[/] Binary metadata extracted ([dim]{metadata.get('executable_format', 'unknown')}[/dim])"
+                    )
                 self.log(f"Metadata extracted (SHA256: {metadata['sha256']})")
 
                 # Phase 3: Extract sections
                 with self.status("Extracting memory sections..."):
                     sections = self.extract_memory_sections(program)
-                    with open(self.output_dir / "sections.json", "w", encoding="utf-8") as f:
+                    with open(
+                        self.output_dir / "sections.json", "w", encoding="utf-8"
+                    ) as f:
                         json.dump(sections, f, indent=2)
                 if not self.verbose:
-                    console.print(f"[green]✓[/] Found [bold]{len(sections)}[/bold] memory sections")
+                    console.print(
+                        f"[green]✓[/] Found [bold]{len(sections)}[/bold] memory sections"
+                    )
 
                 # Phase 4: Extract imports/exports
                 with self.status("Extracting imports/exports..."):
@@ -1184,15 +1214,21 @@ class BinaryArchiveExtractor:
                 if not self.verbose:
                     imp_count = len(imports_exports.get("imports", []))
                     exp_count = len(imports_exports.get("exports", []))
-                    console.print(f"[green]✓[/] Found [bold]{imp_count}[/bold] imports and [bold]{exp_count}[/bold] exports")
+                    console.print(
+                        f"[green]✓[/] Found [bold]{imp_count}[/bold] imports and [bold]{exp_count}[/bold] exports"
+                    )
 
                 # Phase 5: Extract equates
                 with self.status("Extracting equates..."):
                     equates = self.extract_equates(program)
-                    with open(self.output_dir / "equates.json", "w", encoding="utf-8") as f:
+                    with open(
+                        self.output_dir / "equates.json", "w", encoding="utf-8"
+                    ) as f:
                         json.dump(equates, f, indent=2)
                 if not self.verbose:
-                    console.print(f"[green]✓[/] Extracted [bold]{len(equates)}[/bold] equates")
+                    console.print(
+                        f"[green]✓[/] Extracted [bold]{len(equates)}[/bold] equates"
+                    )
 
                 # Phase 6: Process functions (parallel, streaming)
                 func_manager = program.getFunctionManager()
@@ -1245,33 +1281,47 @@ class BinaryArchiveExtractor:
                         )
                         with ThreadPoolExecutor(max_workers=num_workers) as executor:
                             futures = {
-                                executor.submit(self._process_single_function, func, program): idx
+                                executor.submit(
+                                    self._process_single_function, func, program
+                                ): idx
                                 for idx, func in enumerate(functions)
                             }
                             for future in as_completed(futures):
-                                func_data, decomp_filename, decomp_code = future.result()
+                                func_data, decomp_filename, decomp_code = (
+                                    future.result()
+                                )
                                 idx = futures[future]
                                 with self._write_lock:
-                                    _write_function(func_data, decomp_filename, decomp_code, idx)
+                                    _write_function(
+                                        func_data, decomp_filename, decomp_code, idx
+                                    )
                                     processed_count += 1
                                 progress.update(task_id, advance=1)
                 else:
                     with ThreadPoolExecutor(max_workers=num_workers) as executor:
                         futures = {
-                            executor.submit(self._process_single_function, func, program): idx
+                            executor.submit(
+                                self._process_single_function, func, program
+                            ): idx
                             for idx, func in enumerate(functions)
                         }
                         for completed, future in enumerate(as_completed(futures), 1):
                             func_data, decomp_filename, decomp_code = future.result()
                             idx = futures[future]
                             with self._write_lock:
-                                _write_function(func_data, decomp_filename, decomp_code, idx)
+                                _write_function(
+                                    func_data, decomp_filename, decomp_code, idx
+                                )
                                 processed_count += 1
                             if completed % 50 == 0:
-                                self.log(f"Processed {completed}/{len(functions)} functions")
+                                self.log(
+                                    f"Processed {completed}/{len(functions)} functions"
+                                )
 
                 if not self.verbose:
-                    console.print(f"[green]✓[/] Decompiled [bold]{decomp_count}[/bold] of [bold]{len(functions)}[/bold] functions")
+                    console.print(
+                        f"[green]✓[/] Decompiled [bold]{decomp_count}[/bold] of [bold]{len(functions)}[/bold] functions"
+                    )
 
                 # Phase 7: Extract call graph
                 with self.status("Extracting call graph..."):
@@ -1282,14 +1332,18 @@ class BinaryArchiveExtractor:
                         for edge in call_graph:
                             f.write(json.dumps(edge) + "\n")
                 if not self.verbose:
-                    console.print(f"[green]✓[/] Extracted [bold]{len(call_graph)}[/bold] call graph edges")
+                    console.print(
+                        f"[green]✓[/] Extracted [bold]{len(call_graph)}[/bold] call graph edges"
+                    )
 
                 # Phase 8: Create index
                 with self.status("Creating index..."):
-                    with open(self.output_dir / "index.json", "w", encoding="utf-8") as f:
+                    with open(
+                        self.output_dir / "index.json", "w", encoding="utf-8"
+                    ) as f:
                         json.dump(index_map, f, indent=2)
                 if not self.verbose:
-                    console.print(f"[green]✓[/] Function index created")
+                    console.print("[green]✓[/] Function index created")
 
                 # Phase 9: Extract strings
                 with self.status("Extracting strings..."):
@@ -1300,12 +1354,16 @@ class BinaryArchiveExtractor:
                         for string_data in strings_data:
                             f.write(json.dumps(string_data) + "\n")
                 if not self.verbose:
-                    console.print(f"[green]✓[/] Found [bold]{len(strings_data)}[/bold] strings")
+                    console.print(
+                        f"[green]✓[/] Found [bold]{len(strings_data)}[/bold] strings"
+                    )
 
                 # Phase 10: Extract data sections
                 with self.status("Extracting data sections..."):
                     data_sections = self.extract_data_sections(program)
-                    with open(self.output_dir / "data.jsonl", "w", encoding="utf-8") as f:
+                    with open(
+                        self.output_dir / "data.jsonl", "w", encoding="utf-8"
+                    ) as f:
                         for data_item in data_sections:
                             f.write(json.dumps(data_item) + "\n")
 
@@ -1314,10 +1372,14 @@ class BinaryArchiveExtractor:
                         if data_item.get("name"):
                             data_index["by_name"][data_item["name"]] = data_item["ea"]
 
-                    with open(self.output_dir / "data_index.json", "w", encoding="utf-8") as f:
+                    with open(
+                        self.output_dir / "data_index.json", "w", encoding="utf-8"
+                    ) as f:
                         json.dump(data_index, f, indent=2)
                 if not self.verbose:
-                    console.print(f"[green]✓[/] Extracted [bold]{len(data_sections)}[/bold] data items")
+                    console.print(
+                        f"[green]✓[/] Extracted [bold]{len(data_sections)}[/bold] data items"
+                    )
 
                 summary = {
                     "functions_total": len(functions),
@@ -1342,15 +1404,21 @@ class BinaryArchiveExtractor:
             try:
                 if not self.verbose:
                     console.print("🔍 Running CAPA analysis...")
-                capa_summary_path = build_capa_summary(self.binary_path, self.output_dir, verbose=self.verbose)
+                capa_summary_path = build_capa_summary(
+                    self.binary_path, self.output_dir, verbose=self.verbose
+                )
                 if capa_summary_path and not self.verbose:
                     # Read the summary to get stats
                     try:
                         with capa_summary_path.open() as f:
                             capa_data = json.load(f)
                             rules_count = capa_data.get("counts", {}).get("rules", 0)
-                            attack_count = capa_data.get("counts", {}).get("attack_mappings", 0)
-                            console.print(f"[green]✓[/] CAPA found [bold]{rules_count}[/bold] rules, [bold]{attack_count}[/bold] MITRE ATT&CK mappings")
+                            attack_count = capa_data.get("counts", {}).get(
+                                "attack_mappings", 0
+                            )
+                            console.print(
+                                f"[green]✓[/] CAPA found [bold]{rules_count}[/bold] rules, [bold]{attack_count}[/bold] MITRE ATT&CK mappings"
+                            )
                     except Exception:
                         console.print("[green]✓[/] CAPA analysis complete")
                 elif not self.verbose:
@@ -1360,7 +1428,9 @@ class BinaryArchiveExtractor:
                 capa_summary_path = None
 
             if capa_summary_path:
-                metadata.setdefault("artifacts", {})["capa_summary"] = capa_summary_path.name
+                metadata.setdefault("artifacts", {})["capa_summary"] = (
+                    capa_summary_path.name
+                )
                 with meta_path.open("w", encoding="utf-8") as f:
                     json.dump(metadata, f, indent=2)
 
@@ -1397,7 +1467,9 @@ class BinaryArchiveExtractor:
                     summary["data_items"],
                 )
         else:
-            console.print(f"[bold green]✓ Snapshot extraction complete:[/] {self.output_dir.name}")
+            console.print(
+                f"[bold green]✓ Snapshot extraction complete:[/] {self.output_dir.name}"
+            )
 
         return self.output_dir
 
