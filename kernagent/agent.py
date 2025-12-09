@@ -113,10 +113,12 @@ class ReverseEngineeringAgent:
             if not message.tool_calls:
                 # If content is empty after tool calls, prompt the model to respond
                 if not message.content and iteration > 0:
-                    working_messages.append({
-                        "role": "user",
-                        "content": "Based on the tool results above, please provide your analysis and answer."
-                    })
+                    working_messages.append(
+                        {
+                            "role": "user",
+                            "content": "Based on the tool results above, please provide your analysis and answer.",
+                        }
+                    )
                     try:
                         followup_response = self.llm.chat(
                             verbose=verbose,
@@ -251,10 +253,12 @@ class ReverseEngineeringAgent:
                     yield ThinkingEvent(
                         iteration=iteration + 1, max_iterations=self.max_iterations
                     )
-                    working_messages.append({
-                        "role": "user",
-                        "content": "Based on the tool results above, please provide your analysis and answer."
-                    })
+                    working_messages.append(
+                        {
+                            "role": "user",
+                            "content": "Based on the tool results above, please provide your analysis and answer.",
+                        }
+                    )
                     try:
                         followup_response = self.llm.chat(
                             verbose=verbose,
