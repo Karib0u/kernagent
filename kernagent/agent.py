@@ -111,6 +111,26 @@ class ReverseEngineeringAgent:
             working_messages.append(message_dict)
 
             if not message.tool_calls:
+                # If content is empty after tool calls, prompt the model to respond
+                if not message.content and iteration > 0:
+                    working_messages.append({
+                        "role": "user",
+                        "content": "Based on the tool results above, please provide your analysis and answer."
+                    })
+                    try:
+                        followup_response = self.llm.chat(
+                            verbose=verbose,
+                            messages=working_messages,
+                            tools=self.tools_spec,
+                            tool_choice="auto",
+                            temperature=0.1,
+                        )
+                        followup_message = followup_response.choices[0].message
+                        if followup_message.content:
+                            message = followup_message
+                    except Exception as exc:
+                        logger.warning("Followup request failed: %s", exc)
+
                 # Persist only user question and final answer to history
                 final_answer = message.content or "No response generated"
                 self.messages.append({"role": "user", "content": question})
@@ -226,6 +246,29 @@ class ReverseEngineeringAgent:
             working_messages.append(message_dict)
 
             if not message.tool_calls:
+                # If content is empty after tool calls, prompt the model to respond
+                if not message.content and iteration > 0:
+                    yield ThinkingEvent(
+                        iteration=iteration + 1, max_iterations=self.max_iterations
+                    )
+                    working_messages.append({
+                        "role": "user",
+                        "content": "Based on the tool results above, please provide your analysis and answer."
+                    })
+                    try:
+                        followup_response = self.llm.chat(
+                            verbose=verbose,
+                            messages=working_messages,
+                            tools=self.tools_spec,
+                            tool_choice="auto",
+                            temperature=0.1,
+                        )
+                        followup_message = followup_response.choices[0].message
+                        if followup_message.content:
+                            message = followup_message
+                    except Exception as exc:
+                        logger.warning("Followup request failed: %s", exc)
+
                 # Persist only user question and final answer to history
                 final_answer = message.content or "No response generated"
                 self.messages.append({"role": "user", "content": question})

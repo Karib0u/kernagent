@@ -47,26 +47,6 @@ kernagent analyze ./malware.exe
 
 ---
 
-## 📸 The Workflow
-
-### 1. Threat Assessment (`analyze`)
-
-Produces a detailed, evidence-backed security report summarizing capabilities, indicators, strings, heuristics, and ATT&CK mappings.
-
-<div align="center">
-  <img src="docs/images/summary.png" alt="kernagent analysis output" width="700">
-</div>
-
-### 2. Interactive Investigation (`chat`)
-
-Ask follow-up questions with full access to the extracted snapshot (functions, decompilation, strings, cross-references, traces).
-
-<div align="center">
-  <img src="docs/images/ask.png" alt="kernagent chat session" width="700">
-</div>
-
----
-
 ## ✨ Features
 
 * **Headless & Portable**: Runs entirely inside Docker; no host Ghidra installation required.
@@ -81,15 +61,21 @@ Ask follow-up questions with full access to the extracted snapshot (functions, d
 
 ### `init`
 
-Interactive configuration wizard.
+Interactive configuration wizard to set up your LLM provider.
 
 ```bash
 kernagent init
 ```
 
+<div align="center">
+  <img src="docs/images/demo_init.gif" alt="kernagent init demo" width="700">
+</div>
+
 ---
 
 ### `analyze`
+
+Produces a detailed, evidence-backed security report summarizing capabilities, indicators, strings, heuristics, and ATT&CK mappings.
 
 ```bash
 # Standard analysis with streaming output
@@ -102,15 +88,27 @@ kernagent analyze /path/to/binary --full
 kernagent analyze /path/to/binary --json > report.json
 ```
 
+<div align="center">
+  <img src="docs/images/analyze.png" alt="kernagent analyze output" width="700">
+</div>
+
 ---
 
 ### `chat`
 
-Start an interactive REPL with full access to snapshot tools.
+Start an interactive REPL with full access to snapshot tools. Ask questions and the agent uses function calls to explore the binary.
 
 ```bash
 kernagent chat /path/to/binary
 ```
+
+<div align="center">
+  <img src="docs/images/chat1.png" alt="kernagent chat with tool calls" width="700">
+</div>
+
+<div align="center">
+  <img src="docs/images/chat2.png" alt="kernagent chat summary output" width="700">
+</div>
 
 ---
 
@@ -128,6 +126,10 @@ kernagent snapshot --list
 # Force re-extraction
 kernagent snapshot /path/to/binary --force
 ```
+
+<div align="center">
+  <img src="docs/images/snapshot.png" alt="kernagent snapshot list" width="700">
+</div>
 
 ---
 

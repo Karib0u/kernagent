@@ -620,20 +620,3 @@ TOOLS = [
         },
     },
 ]
-
-# ============================================================================
-# LEGACY PROMPTS - Deprecated, kept for backwards compatibility
-# ============================================================================
-
-# DEPRECATED: Use ANALYZE_SYSTEM_PROMPT instead
-AUTO_SUMMARY_PROMPT = """Analyze this binary and provide an executive summary with:
-
-1. **Purpose**: What does this binary do? (1-2 sentences)
-2. **Risk Level**: LOW/MEDIUM/HIGH with brief justification based on capabilities
-3. **Key Behaviors**: Top 3-5 notable behaviors or capabilities (be specific with evidence)
-4. **Interesting Functions**: 3-5 functions worth investigating (include addresses and why they're interesting)
-5. **Notable Imports/APIs**: Critical APIs that reveal intent (group by category: network, crypto, file, process, etc.)
-6. **Notable Strings**: Interesting strings that reveal purpose (URLs, commands, errors, paths)
-
-Keep it concise, actionable, and evidence-based. Cite specific addresses and function names.
-"""
