@@ -314,7 +314,8 @@ def build_capa_summary(
     try:
         doc, rules = _analyze_with_capa(binary_path, resolved_rules)
     except Exception as exc:  # pragma: no cover - depends on runtime environment
-        logger.warning("capa analysis failed for %s: %s", binary_path, exc)
+        if verbose:
+            logger.warning("capa analysis failed for %s: %s", binary_path, exc)
         return None
 
     summaries: List[CapaRuleSummary] = []
